@@ -1,5 +1,5 @@
 # Yoke (Android app)
 
-![Thumbstick](media/thumbstick.gif)
+[Flightgear]](media/flightgear.gif)
 
 See https://github.com/rmst/yoke for more.
