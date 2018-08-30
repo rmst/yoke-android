@@ -105,7 +105,13 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         mSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int pos, long l) {
-                mTarget = parent.getItemAtPosition(pos).toString();
+                String tgt = parent.getItemAtPosition(pos).toString();
+                if(!mServiceNames.contains(mTarget) && !mTarget.equals("nothing")) {
+                    mAdapter.remove(mTarget);
+                    if(tgt.equals(mTarget))
+                        tgt = "nothing";
+                }
+                mTarget = tgt;
                 log("new target " + mTarget);
                 SharedPreferences.Editor editor = sharedPref.edit();
                 editor.putString("target", mTarget);
@@ -268,11 +274,15 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         mServiceMap.put(service.getServiceName(), service);
         mServiceNames.add(service.getServiceName());
         this.runOnUiThread(() -> {
+            if(mTarget.equals(service.getServiceName()))
+                return;
             mAdapter.add(service.getServiceName());
             onServiceNameChange();
         });
 
     }
+
+
 
     @Override
     public void onServiceLost(NsdServiceInfo service) {
@@ -280,6 +290,9 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         mServiceMap.remove(service.getServiceName());
         mServiceNames.remove(service.getServiceName());
         this.runOnUiThread(() -> {
+            if(mTarget.equals(service.getServiceName()))
+                return;
+
             mAdapter.remove(service.getServiceName());
             onServiceNameChange();
         });
