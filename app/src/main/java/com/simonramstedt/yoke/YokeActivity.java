@@ -1,6 +1,7 @@
 package com.simonramstedt.yoke;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.hardware.Sensor;
@@ -12,6 +13,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
+import android.text.InputType;
 import android.util.Log;
 import android.view.Display;
 import android.view.View;
@@ -19,9 +21,11 @@ import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.net.nsd.NsdServiceInfo;
+import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -29,7 +33,9 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +46,8 @@ import java.util.concurrent.locks.ReentrantLock;
 public class YokeActivity extends Activity implements SensorEventListener, NsdManager.DiscoveryListener {
 
     private static final String SERVICE_TYPE = "_yoke._udp.";
+    private static final String NOTHING = "> nothing ";
+    private static final String ENTER_IP = "> new manual connection";
     private SensorManager mSensorManager;
     private PowerManager mPowerManager;
     private WindowManager mWindowManager;
@@ -70,9 +78,11 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
             Log.d("Yoke", m);
     }
 
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        sharedPref = getPreferences(Context.MODE_PRIVATE);
         setContentView(R.layout.main);
 
         // Get an instance of the SensorManager
@@ -99,27 +109,95 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         mSpinner = (Spinner) findViewById(R.id.spinner);
         mAdapter = new ArrayAdapter<>(getApplicationContext(), android.R.layout.simple_spinner_item);
         mAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        mAdapter.add("nothing");
+        mAdapter.add(NOTHING);
+        mAdapter.add(ENTER_IP);
+
+        for(String adr : sharedPref.getString("addresses", "").split(System.lineSeparator())){
+            adr = adr.trim(); // workaround for android bug where random whitespace is added to Strings in shared preferences
+            if(!adr.isEmpty()) {
+                mAdapter.add(adr);
+                mServiceNames.add(adr);
+                log("adding " + adr);
+            }
+        }
         mSpinner.setAdapter(mAdapter);
         mSpinner.setPrompt("Connect to ...");
         mSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int pos, long l) {
+
                 String tgt = parent.getItemAtPosition(pos).toString();
-                if(!mServiceNames.contains(mTarget) && !mTarget.equals("nothing")) {
-                    mAdapter.remove(mTarget);
-                    if(tgt.equals(mTarget))
-                        tgt = "nothing";
+
+                // clean up old target if no longer available
+                String oldtgt = mSpinner.getSelectedItem().toString();
+                if (!mServiceNames.contains(oldtgt) && !oldtgt.equals(NOTHING) && !oldtgt.equals(ENTER_IP)) {
+                    mAdapter.remove(oldtgt);
+                    if(oldtgt.equals(tgt)){
+                        tgt = NOTHING;
+                    }
                 }
-                mTarget = tgt;
-                log("new target " + mTarget);
-                SharedPreferences.Editor editor = sharedPref.edit();
-                editor.putString("target", mTarget);
-                editor.apply();
 
                 closeConnection();
 
-                onServiceNameChange();
+                if(tgt.equals(NOTHING)){
+
+                } else if(tgt.equals(ENTER_IP)) {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this);
+                    builder.setTitle("Enter ip address and port");
+
+                    final EditText input = new EditText(YokeActivity.this);
+                    input.setInputType(InputType.TYPE_CLASS_TEXT);
+                    input.setHint("e.g. 192.168.1.123:11111");
+
+                    builder.setView(input);
+
+                    builder.setPositiveButton("OK", (dialog, which) -> {
+                        String name = input.getText().toString();
+
+                        boolean invalid = name.split(":").length != 2;
+
+                        if(!invalid){
+                            try {
+                                Integer.parseInt(name.split(":")[1]);
+                            } catch (NumberFormatException e) {
+                                invalid = true;
+                            }
+                        }
+
+                        if(invalid){
+                            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
+                            Toast.makeText(YokeActivity.this, "Invalid address", Toast.LENGTH_SHORT).show();
+
+                        } else {
+                            mServiceNames.add(name);
+                            mAdapter.add(name);
+                            mSpinner.setSelection(mAdapter.getPosition(name));
+
+                            SharedPreferences.Editor editor = sharedPref.edit();
+                            String addresses = sharedPref.getString("addresses", "");
+                            addresses = addresses + name + System.lineSeparator();
+                            editor.putString("addresses", addresses);
+                            editor.apply();
+                        }
+                    });
+                    builder.setNegativeButton("Cancel", (dialog, which) -> {
+                        mSpinner.setSelection(mAdapter.getPosition(NOTHING));
+                        dialog.cancel();
+                    });
+
+                    builder.show();
+                } else {
+                    log("new target " + tgt);
+
+                    if(mService != null)  // remove
+                        log("SERVICE NOT NULL!!!");
+
+                    if (mServiceMap.containsKey(tgt)) {
+                        connectToService(tgt);
+                    } else {
+                        connectToAddress(tgt);
+                    }
+                }
             }
 
             @Override
@@ -131,10 +209,6 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         ((Switch) findViewById(R.id.switch1)).setOnCheckedChangeListener((compoundButton, b) -> joystick1.setFixed(b));
 
         ((Switch) findViewById(R.id.switch2)).setOnCheckedChangeListener((compoundButton, b) -> joystick2.setFixed(b));
-
-        sharedPref = getPreferences(Context.MODE_PRIVATE);
-        mTarget = sharedPref.getString("target", "");
-
     }
 
     @Override
@@ -220,50 +294,57 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
 
     }
 
-
-    public void onServiceNameChange(){
-        if(mService == null && mServiceMap.containsKey(mTarget)){
-            NsdServiceInfo service = mServiceMap.get(mTarget);
-            log("Resolving Service: " + service.getServiceType());
-            mNsdManager.resolveService(service, new NsdManager.ResolveListener() {
-                @Override
-                public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
-                    log("Resolve failed: " + errorCode);
-                }
-
-                @Override
-                public void onServiceResolved(NsdServiceInfo serviceInfo) {
-                    // check name again (could have changed in the mean time)
-                    if(mTarget.equals(serviceInfo.getServiceName())){
-                        log("Resolve Succeeded. " + serviceInfo);
-
-                        mService = serviceInfo;
-                        int port = mService.getPort();
-                        InetAddress host = mService.getHost();
-                        log(host.getHostAddress());
-
-                        try {
-                            mSocket = new DatagramSocket(0);
-                            mSocket.connect(host, port);
-
-                            log("Connected");
-                            YokeActivity.this.runOnUiThread(() -> mTextView.setText("Connected to"));
-
-                        } catch (SocketException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            });
-        } else if (mService != null && !mServiceMap.containsKey(mTarget)){
-            if(!mServiceMap.containsKey(mService.getServiceName())) {
-                log("Connection with " + mService.getServiceName() + " lost.");
+    public void connectToService(String tgt){
+        NsdServiceInfo service = mServiceMap.get(tgt);
+        log("Resolving Service: " + service.getServiceType());
+        mNsdManager.resolveService(service, new NsdManager.ResolveListener() {
+            @Override
+            public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
+                log("Resolve failed: " + errorCode);
+                mSpinner.setSelection(mAdapter.getPosition(NOTHING));
             }
 
-            closeConnection();
-        }
+            @Override
+            public void onServiceResolved(NsdServiceInfo serviceInfo) {
+                // check name again (could have changed in the mean time)
+                if (tgt.equals(serviceInfo.getServiceName())) {
+                    log("Resolve Succeeded. " + serviceInfo);
 
+                    mService = serviceInfo;
+                    openSocket(mService.getHost().getHostName(), mService.getPort());
+
+                }
+            }
+        });
     }
+
+    public void connectToAddress(String tgt){
+        log("Connecting directly ip address " + tgt);
+        String[] addr = tgt.split(":");
+        (new Thread(()-> openSocket(addr[0], Integer.parseInt(addr[1])))).start();
+    }
+
+    public void openSocket(String host, int port){
+        log("Trying to open UDP socket to " + host + " on port " + port);
+
+        try {
+            mSocket = new DatagramSocket(0);
+            mSocket.connect(InetAddress.getByName(host), port);
+
+            log("Connected");
+            YokeActivity.this.runOnUiThread(() -> mTextView.setText("Connected to"));
+
+        } catch (SocketException | UnknownHostException e) {
+            mSocket = null;
+            YokeActivity.this.runOnUiThread(() -> {
+                mSpinner.setSelection(mAdapter.getPosition(NOTHING));
+                Toast.makeText(YokeActivity.this, "Failed to connect to " + host + ':' + port, Toast.LENGTH_SHORT).show();
+            });
+            log("Failed to open UDP socket (error message following)");
+            e.printStackTrace();
+        }
+    }
+
     public void onDiscoveryStarted(String regType) {
         log("Service discovery started");
     }
@@ -274,10 +355,9 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         mServiceMap.put(service.getServiceName(), service);
         mServiceNames.add(service.getServiceName());
         this.runOnUiThread(() -> {
-            if(mTarget.equals(service.getServiceName()))
+            if(mSpinner.getSelectedItem().toString().equals(service.getServiceName()))
                 return;
             mAdapter.add(service.getServiceName());
-            onServiceNameChange();
         });
 
     }
@@ -290,13 +370,11 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         mServiceMap.remove(service.getServiceName());
         mServiceNames.remove(service.getServiceName());
         this.runOnUiThread(() -> {
-            if(mTarget.equals(service.getServiceName()))
+            if(mSpinner.getSelectedItem().toString().equals(service.getServiceName()))
                 return;
 
             mAdapter.remove(service.getServiceName());
-            onServiceNameChange();
         });
-
 
     }
 
