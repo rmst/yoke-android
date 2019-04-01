@@ -18,6 +18,8 @@ import android.util.Log;
 import android.view.Display;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebView;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.net.nsd.NsdServiceInfo;
@@ -43,6 +45,7 @@ import java.util.Timer;
 import java.util.concurrent.locks.ReentrantLock;
 
 
+
 public class YokeActivity extends Activity implements SensorEventListener, NsdManager.DiscoveryListener {
 
     private static final String SERVICE_TYPE = "_yoke._udp.";
@@ -60,7 +63,8 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
     private NsdServiceInfo mService;
     private final ReentrantLock resolving = new ReentrantLock();
     private DatagramSocket mSocket;
-    private float[] vals = {0, 0, 0, 0, 0, 0, 0};
+    private float[] vals = {0, 0, 0};
+    private String vals_str = null;
     private Timer mTimer;
     private Map<String, NsdServiceInfo> mServiceMap = new HashMap<>();
     private List<String> mServiceNames = new ArrayList<>();
@@ -69,9 +73,11 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
     private Spinner mSpinner;
     private ArrayAdapter<String> mAdapter;
     private String mTarget = "";
-    private JoystickView joystick1;
+//    private JoystickView joystick1;
     private Handler handler;
-    private JoystickView joystick2;
+//    private JoystickView joystick2;
+
+    private WebView wv;
 
     private void log(String m) {
         if(BuildConfig.DEBUG)
@@ -79,11 +85,35 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
     }
 
 
+    class WebAppInterface {
+        Context mContext;
+
+        /** Instantiate the interface and set the context */
+        WebAppInterface(Context c) {
+            mContext = c;
+        }
+
+        /** Show a toast from the web page */
+        @JavascriptInterface
+        public void update_vals(String vals) {
+            vals_str = vals;
+            update();
+        }
+    }
+
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         sharedPref = getPreferences(Context.MODE_PRIVATE);
-        setContentView(R.layout.main);
+//        setContentView(R.layout.main);
+        setContentView(R.layout.main_wv);
+
+        wv = findViewById(R.id.webView);
+
+        wv.getSettings().setJavaScriptEnabled(true);
+        wv.addJavascriptInterface(new WebAppInterface(this), "Yoke");
+
 
         // Get an instance of the SensorManager
         mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
@@ -101,8 +131,8 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-        joystick1 = (JoystickView) findViewById(R.id.joystickView1);
-        joystick2 = (JoystickView) findViewById(R.id.joystickView2);
+//        joystick1 = (JoystickView) findViewById(R.id.joystickView1);
+//        joystick2 = (JoystickView) findViewById(R.id.joystickView2);
 
         mTextView = (TextView) findViewById(R.id.textView);
 
@@ -206,9 +236,9 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
             }
         });
 
-        ((Switch) findViewById(R.id.switch1)).setOnCheckedChangeListener((compoundButton, b) -> joystick1.setFixed(b));
-
-        ((Switch) findViewById(R.id.switch2)).setOnCheckedChangeListener((compoundButton, b) -> joystick2.setFixed(b));
+//        ((Switch) findViewById(R.id.switch1)).setOnCheckedChangeListener((compoundButton, b) -> joystick1.setFixed(b));
+//
+//        ((Switch) findViewById(R.id.switch2)).setOnCheckedChangeListener((compoundButton, b) -> joystick2.setFixed(b));
     }
 
     @Override
@@ -224,12 +254,15 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
 
             @Override
             public void run() {
-                float[] p1 = joystick1.getRelPos();
-                float[] p2 = joystick2.getRelPos();
-                vals[3] = p1[0];
-                vals[4] = p1[1];
-                vals[5] = p2[0];
-                vals[6] = p2[1];
+//                float[] p1 = joystick1.getRelPos();
+//                float[] p2 = joystick2.getRelPos();
+//                float[] p1 = {0f, 0f};
+//                float[] p2 = {0f, 0f};
+//
+//                vals[3] = p1[0];
+//                vals[4] = p1[1];
+//                vals[5] = p2[0];
+//                vals[6] = p2[1];
                 update();
 
                 if(handler != null)
@@ -276,10 +309,12 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         if(mSocket != null){
             StringBuilder s = new StringBuilder();
             for(float v : vals){
-                s.append(" ");
+                s.append(",");
                 s.append(String.valueOf(v));
             }
-            send(s.toString().getBytes());
+
+        if(vals_str != null)
+            send((s.toString() + "," + vals_str).getBytes());
         }
     }
 
@@ -332,7 +367,13 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
             mSocket.connect(InetAddress.getByName(host), port);
 
             log("Connected");
-            YokeActivity.this.runOnUiThread(() -> mTextView.setText("Connected to"));
+            YokeActivity.this.runOnUiThread(() -> {
+                mTextView.setText("Connected to");
+
+                String url = "http://" + host + ":" + port + "/main.html";
+                wv.loadUrl(url);
+                log("Loading from " + url);
+            });
 
         } catch (SocketException | UnknownHostException e) {
             mSocket = null;
