@@ -4,10 +4,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
 import android.net.nsd.NsdManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -46,16 +42,14 @@ import java.util.concurrent.locks.ReentrantLock;
 
 
 
-public class YokeActivity extends Activity implements SensorEventListener, NsdManager.DiscoveryListener {
+public class YokeActivity extends Activity implements NsdManager.DiscoveryListener {
     private static final String SERVICE_TYPE = "_yoke._udp.";
     private static final String NOTHING = "> nothing ";
     private static final String ENTER_IP = "> new manual connection";
-    private SensorManager mSensorManager;
     private PowerManager mPowerManager;
     private WindowManager mWindowManager;
     private Display mDisplay;
     private WakeLock mWakeLock;
-    private Sensor mAccelerometer;
     private ServerSocket mServerSocket;
     private NsdManager mNsdManager;
     private NsdServiceInfo mNsdServiceInfo;
@@ -108,10 +102,6 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         wv.getSettings().setJavaScriptEnabled(true);
         wv.addJavascriptInterface(new WebAppInterface(this), "Yoke");
 
-
-        // Get an instance of the SensorManager
-        mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-
         // Get an instance of the PowerManager
         mPowerManager = (PowerManager) getSystemService(POWER_SERVICE);
 
@@ -120,8 +110,6 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         mDisplay = mWindowManager.getDefaultDisplay();
 
         mNsdManager = (NsdManager) getSystemService(Context.NSD_SERVICE);
-
-        mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
@@ -229,52 +217,6 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
 
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-
-        mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_UI);
-
-        mNsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, this);
-
-        handler = new Handler();
-        handler.post(new Runnable() {
-
-            @Override
-            public void run() {
-                update();
-
-                if (handler != null)
-                    handler.postDelayed(this, 20);
-            }
-        });
-
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-
-        mSensorManager.unregisterListener(this);
-
-        mNsdManager.stopServiceDiscovery(this);
-
-        closeConnection();
-
-        handler = null;
-    }
-
-    @Override
-    public void onSensorChanged(SensorEvent event) {
-
-    }
-
-
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int i) {
-
-    }
-
     private void update() {
         if (mSocket != null && vals_str != null) {
             send(vals_str.getBytes());
@@ -364,8 +306,6 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         });
 
     }
-
-
 
     @Override
     public void onServiceLost(NsdServiceInfo service) {
