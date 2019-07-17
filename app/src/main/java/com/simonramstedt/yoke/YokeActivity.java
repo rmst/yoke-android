@@ -47,7 +47,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 
 public class YokeActivity extends Activity implements SensorEventListener, NsdManager.DiscoveryListener {
-
     private static final String SERVICE_TYPE = "_yoke._udp.";
     private static final String NOTHING = "> nothing ";
     private static final String ENTER_IP = "> new manual connection";
@@ -73,14 +72,11 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
     private Spinner mSpinner;
     private ArrayAdapter<String> mAdapter;
     private String mTarget = "";
-//    private JoystickView joystick1;
     private Handler handler;
-//    private JoystickView joystick2;
-
     private WebView wv;
 
     private void log(String m) {
-        if(BuildConfig.DEBUG)
+        if (BuildConfig.DEBUG)
             Log.d("Yoke", m);
     }
 
@@ -106,7 +102,6 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         sharedPref = getPreferences(Context.MODE_PRIVATE);
-//        setContentView(R.layout.main);
         setContentView(R.layout.main_wv);
 
         wv = findViewById(R.id.webView);
@@ -131,9 +126,6 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-//        joystick1 = (JoystickView) findViewById(R.id.joystickView1);
-//        joystick2 = (JoystickView) findViewById(R.id.joystickView2);
-
         mTextView = (TextView) findViewById(R.id.textView);
 
         mSpinner = (Spinner) findViewById(R.id.spinner);
@@ -142,9 +134,9 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         mAdapter.add(NOTHING);
         mAdapter.add(ENTER_IP);
 
-        for(String adr : sharedPref.getString("addresses", "").split(System.lineSeparator())){
+        for (String adr : sharedPref.getString("addresses", "").split(System.lineSeparator())) {
             adr = adr.trim(); // workaround for android bug where random whitespace is added to Strings in shared preferences
-            if(!adr.isEmpty()) {
+            if (!adr.isEmpty()) {
                 mAdapter.add(adr);
                 mServiceNames.add(adr);
                 log("adding " + adr);
@@ -162,16 +154,16 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
                 String oldtgt = mSpinner.getSelectedItem().toString();
                 if (!mServiceNames.contains(oldtgt) && !oldtgt.equals(NOTHING) && !oldtgt.equals(ENTER_IP)) {
                     mAdapter.remove(oldtgt);
-                    if(oldtgt.equals(tgt)){
+                    if (oldtgt.equals(tgt)) {
                         tgt = NOTHING;
                     }
                 }
 
                 closeConnection();
 
-                if(tgt.equals(NOTHING)){
+                if (tgt.equals(NOTHING)) {
 
-                } else if(tgt.equals(ENTER_IP)) {
+                } else if (tgt.equals(ENTER_IP)) {
                     AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this);
                     builder.setTitle("Enter ip address and port");
 
@@ -186,7 +178,7 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
 
                         boolean invalid = name.split(":").length != 2;
 
-                        if(!invalid){
+                        if (!invalid) {
                             try {
                                 Integer.parseInt(name.split(":")[1]);
                             } catch (NumberFormatException e) {
@@ -194,7 +186,7 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
                             }
                         }
 
-                        if(invalid){
+                        if (invalid) {
                             mSpinner.setSelection(mAdapter.getPosition(NOTHING));
                             Toast.makeText(YokeActivity.this, "Invalid address", Toast.LENGTH_SHORT).show();
 
@@ -219,7 +211,7 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
                 } else {
                     log("new target " + tgt);
 
-                    if(mService != null)  // remove
+                    if (mService != null)  // remove
                         log("SERVICE NOT NULL!!!");
 
                     if (mServiceMap.containsKey(tgt)) {
@@ -236,9 +228,6 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
             }
         });
 
-//        ((Switch) findViewById(R.id.switch1)).setOnCheckedChangeListener((compoundButton, b) -> joystick1.setFixed(b));
-//
-//        ((Switch) findViewById(R.id.switch2)).setOnCheckedChangeListener((compoundButton, b) -> joystick2.setFixed(b));
     }
 
     @Override
@@ -254,20 +243,10 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
 
             @Override
             public void run() {
-//                float[] p1 = joystick1.getRelPos();
-//                float[] p2 = joystick2.getRelPos();
-//                float[] p1 = {0f, 0f};
-//                float[] p2 = {0f, 0f};
-//
-//                vals[3] = p1[0];
-//                vals[4] = p1[1];
-//                vals[5] = p2[0];
-//                vals[6] = p2[1];
                 update();
 
-                if(handler != null)
+                if (handler != null)
                     handler.postDelayed(this, 20);
-
             }
         });
 
@@ -305,15 +284,15 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
 
     }
 
-    private void update(){
-        if(mSocket != null){
+    private void update() {
+        if (mSocket != null) {
             StringBuilder s = new StringBuilder();
-            for(float v : vals){
+            for (float v : vals) {
                 s.append(",");
                 s.append(String.valueOf(v));
             }
 
-        if(vals_str != null)
+        if (vals_str != null)
             send((s.toString() + "," + vals_str).getBytes());
         }
     }
@@ -326,10 +305,9 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         } catch (NullPointerException e) {
             log("Send error " + e.getMessage());
         }
-
     }
 
-    public void connectToService(String tgt){
+    public void connectToService(String tgt) {
         NsdServiceInfo service = mServiceMap.get(tgt);
         log("Resolving Service: " + service.getServiceType());
         mNsdManager.resolveService(service, new NsdManager.ResolveListener() {
@@ -353,13 +331,13 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         });
     }
 
-    public void connectToAddress(String tgt){
+    public void connectToAddress(String tgt) {
         log("Connecting directly ip address " + tgt);
         String[] addr = tgt.split(":");
         (new Thread(()-> openSocket(addr[0], Integer.parseInt(addr[1])))).start();
     }
 
-    public void openSocket(String host, int port){
+    public void openSocket(String host, int port) {
         log("Trying to open UDP socket to " + host + " on port " + port);
 
         try {
@@ -396,7 +374,7 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         mServiceMap.put(service.getServiceName(), service);
         mServiceNames.add(service.getServiceName());
         this.runOnUiThread(() -> {
-            if(mSpinner.getSelectedItem().toString().equals(service.getServiceName()))
+            if (mSpinner.getSelectedItem().toString().equals(service.getServiceName()))
                 return;
             mAdapter.add(service.getServiceName());
         });
@@ -411,7 +389,7 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
         mServiceMap.remove(service.getServiceName());
         mServiceNames.remove(service.getServiceName());
         this.runOnUiThread(() -> {
-            if(mSpinner.getSelectedItem().toString().equals(service.getServiceName()))
+            if (mSpinner.getSelectedItem().toString().equals(service.getServiceName()))
                 return;
 
             mAdapter.remove(service.getServiceName());
@@ -438,7 +416,7 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
 
     private void closeConnection() {
         mService = null;
-        if(mSocket != null){
+        if (mSocket != null) {
             log("Connection closed");
             mTextView.setText(" Connect to ");
             mSocket.close();
