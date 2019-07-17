@@ -62,7 +62,6 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
     private NsdServiceInfo mService;
     private final ReentrantLock resolving = new ReentrantLock();
     private DatagramSocket mSocket;
-    private float[] vals = {0, 0, 0};
     private String vals_str = null;
     private Timer mTimer;
     private Map<String, NsdServiceInfo> mServiceMap = new HashMap<>();
@@ -267,14 +266,6 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType() != Sensor.TYPE_GRAVITY)
-            return;
-
-        vals[0] = event.values[0];
-        vals[1] = event.values[1];
-        vals[2] = event.values[2];
-
-        update();
 
     }
 
@@ -285,15 +276,8 @@ public class YokeActivity extends Activity implements SensorEventListener, NsdMa
     }
 
     private void update() {
-        if (mSocket != null) {
-            StringBuilder s = new StringBuilder();
-            for (float v : vals) {
-                s.append(",");
-                s.append(String.valueOf(v));
-            }
-
-        if (vals_str != null)
-            send((s.toString() + "," + vals_str).getBytes());
+        if (mSocket != null && vals_str != null) {
+            send(vals_str.getBytes());
         }
     }
 
