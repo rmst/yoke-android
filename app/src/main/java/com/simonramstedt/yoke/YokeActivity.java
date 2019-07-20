@@ -217,6 +217,37 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        mNsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, this);
+
+        handler = new Handler();
+        handler.post(new Runnable() {
+
+            @Override
+            public void run() {
+                update();
+
+                if (handler != null)
+                    handler.postDelayed(this, 20);
+            }
+        });
+
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        mNsdManager.stopServiceDiscovery(this);
+
+        closeConnection();
+
+        handler = null;
+    }
+
     private void update() {
         if (mSocket != null && vals_str != null) {
             send(vals_str.getBytes());
@@ -306,6 +337,8 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         });
 
     }
+
+
 
     @Override
     public void onServiceLost(NsdServiceInfo service) {
