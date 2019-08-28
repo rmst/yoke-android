@@ -24,7 +24,7 @@
             android:id="@+id/reconnectButton"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:text="Reconnect"
+            android:text="@string/toolbar_reconnect"
             android:onClick="reconnect" />
 
         <TextView
@@ -34,7 +34,7 @@
             android:layout_margin="3.5pt"
             android:gravity="center"
 
-            android:text=" Connect to " />
+            android:text="@string/toolbar_connect_to" />
 
         <Spinner
             android:id="@+id/spinner"

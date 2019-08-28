@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.Resources;
 import android.net.nsd.NsdManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -37,9 +38,9 @@ import java.util.Map;
 
 
 public class YokeActivity extends Activity implements NsdManager.DiscoveryListener {
-    private static final String SERVICE_TYPE = "_yoke._udp.";
-    private static final String NOTHING = "> nothing ";
-    private static final String ENTER_IP = "> new manual connection";
+    private final String SERVICE_TYPE = "_yoke._udp.";
+    private String NOTHING;
+    private String ENTER_IP;
     private WindowManager mWindowManager;
     private NsdManager mNsdManager;
     private NsdServiceInfo mService;
@@ -53,6 +54,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private ArrayAdapter<String> mAdapter;
     private Handler handler;
     private WebView wv;
+    private Resources res;
 
     private void log(String m) {
         if (BuildConfig.DEBUG)
@@ -95,6 +97,11 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+        // Localization. TODO: detect NOTHING and MANUAL CONNECTION buttons by id, not by content.
+        res = getResources();
+        NOTHING = res.getString(R.string.dropdown_nothing);
+        ENTER_IP = res.getString(R.string.dropdown_enter_ip);
+
         mTextView = (TextView) findViewById(R.id.textView);
 
         mSpinner = (Spinner) findViewById(R.id.spinner);
@@ -108,11 +115,11 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             if (!adr.isEmpty()) {
                 mAdapter.add(adr);
                 mServiceNames.add(adr);
-                log("adding " + adr);
+                log(String.format(res.getString(R.string.log_adding_address), adr));
             }
         }
         mSpinner.setAdapter(mAdapter);
-        mSpinner.setPrompt("Connect to ...");
+        mSpinner.setPrompt(res.getString(R.string.dropdown_connect_to));
         mSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int pos, long l) {
@@ -134,15 +141,15 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
                 } else if (tgt.equals(ENTER_IP)) {
                     AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this);
-                    builder.setTitle("Enter ip address and port");
+                    builder.setTitle(res.getString(R.string.enter_ip_title));
 
                     final EditText input = new EditText(YokeActivity.this);
                     input.setInputType(InputType.TYPE_CLASS_TEXT);
-                    input.setHint("e.g. 192.168.1.123:11111");
+                    input.setHint(res.getString(R.string.enter_ip_hint));
 
                     builder.setView(input);
 
-                    builder.setPositiveButton("OK", (dialog, which) -> {
+                    builder.setPositiveButton(res.getString(R.string.enter_ip_ok), (dialog, which) -> {
                         String name = input.getText().toString();
 
                         boolean invalid = name.split(":").length != 2;
@@ -157,7 +164,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
                         if (invalid) {
                             mSpinner.setSelection(mAdapter.getPosition(NOTHING));
-                            Toast.makeText(YokeActivity.this, "Invalid address", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(YokeActivity.this, res.getString(R.string.toast_invalid_address), Toast.LENGTH_SHORT).show();
 
                         } else {
                             mServiceNames.add(name);
@@ -171,17 +178,17 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                             editor.apply();
                         }
                     });
-                    builder.setNegativeButton("Cancel", (dialog, which) -> {
+                    builder.setNegativeButton(res.getString(R.string.enter_ip_cancel), (dialog, which) -> {
                         mSpinner.setSelection(mAdapter.getPosition(NOTHING));
                         dialog.cancel();
                     });
 
                     builder.show();
                 } else {
-                    log("new target " + tgt);
+                    log(String.format(res.getString(R.string.log_service_targeting), tgt));
 
                     if (mService != null)  // remove
-                        log("SERVICE NOT NULL!!!");
+                        log(res.getString(R.string.log_service_not_null));
 
                     if (mServiceMap.containsKey(tgt)) {
                         connectToService(tgt);
@@ -193,7 +200,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
             @Override
             public void onNothingSelected(AdapterView<?> adapterView) {
-                log("nothing selected");
+                log(res.getString(R.string.log_nothing_selected));
             }
         });
 
@@ -254,19 +261,19 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         try {
             mSocket.send(new DatagramPacket(msg, msg.length));
         } catch (IOException e) {
-            log("Send error: " + e.getMessage());
+            log(String.format(res.getString(R.string.log_send_error), e.getMessage()));
         } catch (NullPointerException e) {
-            log("Send error " + e.getMessage());
+            log(String.format(res.getString(R.string.log_send_error), e.getMessage()));
         }
     }
 
     public void connectToService(String tgt) {
         NsdServiceInfo service = mServiceMap.get(tgt);
-        log("Resolving Service: " + service.getServiceType());
+        log(String.format(res.getString(R.string.log_service_resolving), service.getServiceType()));
         mNsdManager.resolveService(service, new NsdManager.ResolveListener() {
             @Override
             public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
-                log("Resolve failed: " + errorCode);
+                log(String.format(res.getString(R.string.log_service_resolve_error), errorCode));
                 mSpinner.setSelection(mAdapter.getPosition(NOTHING));
             }
 
@@ -274,7 +281,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             public void onServiceResolved(NsdServiceInfo serviceInfo) {
                 // check name again (could have changed in the mean time)
                 if (tgt.equals(serviceInfo.getServiceName())) {
-                    log("Resolve Succeeded. " + serviceInfo);
+                    log(res.getString(R.string.log_service_resolve_success) + serviceInfo);
 
                     mService = serviceInfo;
                     openSocket(mService.getHost().getHostName(), mService.getPort());
@@ -285,7 +292,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     }
 
     public void connectToAddress(String tgt) {
-        log("Connecting directly ip address " + tgt);
+        log(String.format(res.getString(R.string.log_directly_connecting), tgt));
         String[] addr = tgt.split(":");
         (new Thread(()-> openSocket(addr[0], Integer.parseInt(addr[1])))).start();
     }
@@ -301,39 +308,39 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     }
 
     public void openSocket(String host, int port) {
-        log("Trying to open UDP socket to " + host + " on port " + port);
+        log(String.format(res.getString(R.string.log_opening_udp), host, port));
 
         try {
             mSocket = new DatagramSocket(0);
             mSocket.connect(InetAddress.getByName(host), port);
 
-            log("Connected");
+            log(res.getString(R.string.log_open_udp_success));
             YokeActivity.this.runOnUiThread(() -> {
-                mTextView.setText("Connected to");
+                mTextView.setText(res.getString(R.string.toolbar_connected_to));
 
                 String url = "http://" + host + ":" + port + "/main.html";
                 wv.loadUrl(url);
-                log("Loading from " + url);
+                log(String.format(res.getString(R.string.log_loading_url), url));
             });
 
         } catch (SocketException | UnknownHostException e) {
             mSocket = null;
             YokeActivity.this.runOnUiThread(() -> {
                 mSpinner.setSelection(mAdapter.getPosition(NOTHING));
-                Toast.makeText(YokeActivity.this, "Failed to connect to " + host + ':' + port, Toast.LENGTH_SHORT).show();
+                Toast.makeText(YokeActivity.this, String.format(res.getString(R.string.toast_could_not_connect), host, port), Toast.LENGTH_SHORT).show();
             });
-            log("Failed to open UDP socket (error message following)");
+            log(res.getString(R.string.log_open_udp_error));
             e.printStackTrace();
         }
     }
 
     public void onDiscoveryStarted(String regType) {
-        log("Service discovery started");
+        log(res.getString(R.string.log_discovery_started));
     }
 
     @Override
     public void onServiceFound(NsdServiceInfo service) {
-        log("Service found " + service);
+        log(res.getString(R.string.log_service_found) + service);
         mServiceMap.put(service.getServiceName(), service);
         mServiceNames.add(service.getServiceName());
         this.runOnUiThread(() -> {
@@ -348,7 +355,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
     @Override
     public void onServiceLost(NsdServiceInfo service) {
-        log("Service lost " + service);
+        log(res.getString(R.string.log_service_lost) + service);
         mServiceMap.remove(service.getServiceName());
         mServiceNames.remove(service.getServiceName());
         this.runOnUiThread(() -> {
@@ -362,26 +369,26 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
     @Override
     public void onDiscoveryStopped(String serviceType) {
-        log("Discovery stopped: " + serviceType);
+        log(String.format(res.getString(R.string.log_discovery_stopped), serviceType));
     }
 
     @Override
     public void onStartDiscoveryFailed(String serviceType, int errorCode) {
-        log("Discovery failed: Error code:" + errorCode);
+        log(String.format(res.getString(R.string.log_discovery_error), errorCode));
         mNsdManager.stopServiceDiscovery(this);
     }
 
     @Override
     public void onStopDiscoveryFailed(String serviceType, int errorCode) {
-        log("Discovery failed: Error code:" + errorCode);
+        log(String.format(res.getString(R.string.log_discovery_error), errorCode));
         mNsdManager.stopServiceDiscovery(this);
     }
 
     private void closeConnection() {
         mService = null;
         if (mSocket != null) {
-            log("Connection closed");
-            mTextView.setText(" Connect to ");
+            log(res.getString(R.string.log_udp_closed));
+            mTextView.setText(res.getString(R.string.toolbar_connect_to));
             mSocket.close();
             mSocket = null;
         }
