@@ -7,8 +7,6 @@ import android.content.SharedPreferences;
 import android.net.nsd.NsdManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.PowerManager;
-import android.os.PowerManager.WakeLock;
 import android.text.InputType;
 import android.util.Log;
 import android.view.Display;
@@ -35,7 +33,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.ReentrantLock;
 
 
 
@@ -43,15 +40,12 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private static final String SERVICE_TYPE = "_yoke._udp.";
     private static final String NOTHING = "> nothing ";
     private static final String ENTER_IP = "> new manual connection";
-    private PowerManager mPowerManager;
     private WindowManager mWindowManager;
     private Display mDisplay;
-    private WakeLock mWakeLock;
     private ServerSocket mServerSocket;
     private NsdManager mNsdManager;
     private NsdServiceInfo mNsdServiceInfo;
     private NsdServiceInfo mService;
-    private final ReentrantLock resolving = new ReentrantLock();
     private DatagramSocket mSocket;
     private String vals_str = null;
     private Map<String, NsdServiceInfo> mServiceMap = new HashMap<>();
@@ -97,9 +91,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
         wv.getSettings().setJavaScriptEnabled(true);
         wv.addJavascriptInterface(new WebAppInterface(this), "Yoke");
-
-        // Get an instance of the PowerManager
-        mPowerManager = (PowerManager) getSystemService(POWER_SERVICE);
 
         // Get an instance of the WindowManager
         mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
