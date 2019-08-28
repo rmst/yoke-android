@@ -20,6 +20,13 @@
             android:layout_height="match_parent"
             android:src="@mipmap/yoke" />
 
+        <Button xmlns:android="http://schemas.android.com/apk/res/android"
+            android:id="@+id/reconnectButton"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:text="Reconnect"
+            android:onClick="reconnect" />
+
         <TextView
             android:id="@+id/textView"
             android:layout_width="wrap_content"
@@ -34,7 +41,6 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:spinnerMode="dialog" />
-
 
     </LinearLayout>
 

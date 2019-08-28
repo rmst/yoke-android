@@ -41,10 +41,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private static final String NOTHING = "> nothing ";
     private static final String ENTER_IP = "> new manual connection";
     private WindowManager mWindowManager;
-    private Display mDisplay;
-    private ServerSocket mServerSocket;
     private NsdManager mNsdManager;
-    private NsdServiceInfo mNsdServiceInfo;
     private NsdServiceInfo mService;
     private DatagramSocket mSocket;
     private String vals_str = null;
@@ -54,7 +51,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private TextView mTextView;
     private Spinner mSpinner;
     private ArrayAdapter<String> mAdapter;
-    private String mTarget = "";
     private Handler handler;
     private WebView wv;
 
@@ -94,7 +90,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
         // Get an instance of the WindowManager
         mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        mDisplay = mWindowManager.getDefaultDisplay();
 
         mNsdManager = (NsdManager) getSystemService(Context.NSD_SERVICE);
 
@@ -295,6 +290,16 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         (new Thread(()-> openSocket(addr[0], Integer.parseInt(addr[1])))).start();
     }
 
+    public void reconnect(View view) {
+        String tgt = mSpinner.getSelectedItem().toString();
+        closeConnection();
+        if (mServiceMap.containsKey(tgt)) {
+            connectToService(tgt);
+        } else {
+            connectToAddress(tgt);
+        }
+    }
+
     public void openSocket(String host, int port) {
         log("Trying to open UDP socket to " + host + " on port " + port);
 
@@ -380,5 +385,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             mSocket.close();
             mSocket = null;
         }
+        wv.loadUrl("about:blank");
+        vals_str = null;
     }
 }
