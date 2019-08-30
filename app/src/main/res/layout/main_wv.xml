@@ -20,11 +20,13 @@
             android:layout_height="match_parent"
             android:src="@mipmap/yoke" />
 
-        <Button xmlns:android="http://schemas.android.com/apk/res/android"
+        <ImageButton
             android:id="@+id/reconnectButton"
+            android:src="@drawable/baseline_refresh_24"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:text="@string/toolbar_reconnect"
+            android:contentDescription="@string/toolbar_reconnect"
+            android:tooltipText="@string/toolbar_reconnect"
             android:onClick="reconnect" />
 
         <TextView

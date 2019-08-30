@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.net.nsd.NsdManager;
+import android.net.nsd.NsdServiceInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.InputType;
@@ -17,7 +18,6 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.net.nsd.NsdServiceInfo;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -299,11 +299,15 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
     public void reconnect(View view) {
         String tgt = mSpinner.getSelectedItem().toString();
-        closeConnection();
-        if (mServiceMap.containsKey(tgt)) {
-            connectToService(tgt);
+        if (tgt.equals(NOTHING)) {
+            Toast.makeText(YokeActivity.this, res.getString(R.string.toast_cant_reconnect_if_not_connected), Toast.LENGTH_SHORT).show();
         } else {
-            connectToAddress(tgt);
+            closeConnection();
+            if (mServiceMap.containsKey(tgt)) {
+                connectToService(tgt);
+            } else {
+                connectToAddress(tgt);
+            }
         }
     }
 

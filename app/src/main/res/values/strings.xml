@@ -1,5 +1,5 @@
 <resources>
-    <!-- Name for the app (maybe we'll want to translate it to other languages, or transcript the pronunciation. -->
+    <!-- Name for the app (even if it's never translated or clarified, non-latin-alphaber languages might use a phonetic transcription). -->
     <string name="app_name">Yoke</string>
 
     <!-- Strings for the toolbar, displayed as soon as the app is opened -->
@@ -9,8 +9,9 @@
     <string name="toolbar_reconnect">Reconnect</string>
 
     <!-- Toasts shown on error -->
-    <string name="toast_could_not_connect">Failed to connect to %1$s:%2$d</string>
+    <string name="toast_could_not_connect">Failed to connect to %1$s:%2$d.</string>
     <string name="toast_invalid_address">Invalid address</string>
+    <string name="toast_cant_reconnect_if_not_connected">Please use the dropdown menu to connect to a machine.</string>
 
     <!-- These strings are displayed when the user opens the spinner to select a machine to connect to -->
     <string name="dropdown_connect_to">Connect to…</string>
@@ -28,7 +29,7 @@
     <string name="log_directly_connecting">Connecting directly to IP address %1$s…</string>
     <string name="log_discovery_error">Service discovery failed with error code %1$d.</string>
     <string name="log_discovery_started">Service discovery started.</string>
-    <string name="log_discovery_stopped">Service discovery stopped: %1$s.</string>
+    <string name="log_discovery_stopped">Service discovery stopped: "%1$s".</string>
     <string name="log_loading_url">Loading from %1$s</string>
     <string name="log_nothing_selected">Nothing selected.</string>
     <string name="log_open_udp_error">Failed to open UDP socket. Error message following:</string>
@@ -40,8 +41,8 @@
     <string name="log_service_not_null">SERVICE NOT NULL!!!</string>
     <string name="log_service_resolve_error">Resolve failed with error code %1$d.</string>
     <string name="log_service_resolve_success">Resolve succeeded. </string>
-    <string name="log_service_resolving">Resolving service: %1$s…</string>
-    <string name="log_service_targeting">New service target: %1$s</string>
+    <string name="log_service_resolving">Resolving service "%1$s"…</string>
+    <string name="log_service_targeting">New service target: "%1$s".</string>
     <string name="log_udp_closed">Connection closed.</string>
 </resources>
 
