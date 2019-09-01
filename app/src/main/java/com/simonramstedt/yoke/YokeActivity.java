@@ -67,12 +67,12 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     class WebAppInterface {
         Context mContext;
 
-        /** Instantiate the interface and set the context */
+        // Instantiate the interface and set the context
         WebAppInterface(Context c) {
             mContext = c;
         }
 
-        /** Show a toast from the web page */
+        // Webpage uses this method to update joypad state:
         @JavascriptInterface
         public void update_vals(String vals) {
             vals_str = vals;
@@ -88,7 +88,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         setContentView(R.layout.main_wv);
 
         wv = findViewById(R.id.webView);
-
         wv.getSettings().setJavaScriptEnabled(true);
         wv.addJavascriptInterface(new WebAppInterface(this), "Yoke");
 
@@ -102,7 +101,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         ENTER_IP = res.getString(R.string.dropdown_enter_ip);
 
         // Finding the gamepad:
-        url = "file://" + new File(getExternalFilesDir(null), "joypad/main.html").toString();
+        url = "file://" + new File(getExternalFilesDir(null), "main.html").toString();
 
         // Filling spinner with addresses to connect to:
         mTextView = (TextView) findViewById(R.id.textView);

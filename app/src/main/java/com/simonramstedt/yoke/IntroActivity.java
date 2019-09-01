@@ -21,8 +21,13 @@ public class IntroActivity extends Activity {
     private String storageState;
     private Resources res;
     private Intent mIntent;
-    private String externalPath;
+    private File externalPath;
     private File layoutMain;
+
+    private void log(String m) {
+        if (BuildConfig.DEBUG)
+            Log.d("Yoke", m);
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -33,8 +38,8 @@ public class IntroActivity extends Activity {
 
         res = getResources();
         mIntent = new Intent(getApplicationContext(), YokeActivity.class);
-        externalPath = getExternalFilesDir(null).toString();
-        layoutMain = new File(getExternalFilesDir(null), "joypad/main.html");
+        externalPath = getExternalFilesDir(null);
+        layoutMain = new File(getExternalFilesDir(null), "main.html");
         introWelcome = (TextView) findViewById(R.id.introWelcome);
         introNotice = (TextView) findViewById(R.id.introNotice);
         introWelcome.setText(String.format(res.getString(R.string.intro_welcome), res.getString(R.string.app_name)));
@@ -52,9 +57,15 @@ public class IntroActivity extends Activity {
                 startActivity(mIntent);
             } else {
                 if (storageState.equals(Environment.MEDIA_MOUNTED_READ_ONLY)) {
-                    introNotice.setText(String.format(res.getString(R.string.intro_readonly_storage), externalPath));
+                    introNotice.setText(String.format(res.getString(R.string.intro_readonly_storage), externalPath.toString()));
                 } else {
-                    introNotice.setText(String.format(res.getString(R.string.intro_create_files), externalPath));
+                    try {
+                        externalPath.mkdirs();
+                        introNotice.setText(String.format(res.getString(R.string.intro_create_files), externalPath.toString()));
+                    } catch (SecurityException e) {
+                        log(e.getMessage());
+                        introNotice.setText(res.getString(R.string.intro_security_exception));
+                    }
                 }
             }
         } else {

@@ -13,11 +13,15 @@
     </string>
     <string name="intro_unavailable_storage">
         <p>External storage is not available.</p>
-        <p>You may be missing a memory card, or another program could be preventing access to Yoke. Please click the button to try again.</p>
+        <p>You may be missing a memory card, or another program could be preventing Yoke from accessing it. Please click the button to try again.</p>
+    </string>
+    <string name="intro_security_exception">
+        <p>External storage is mounted as read-write, but Yoke couldn\'t create folders in it.</p>
+        <p>Please check if another program could be preventing Yoke from writing files. Then, click the button to try again.</p>
     </string>
     <string name="intro_readonly_storage">
         <p>No gamepad layout could be found.</p>
-        <p>A default layout can be copied to <tt>%1$s</tt>, but that folder is mounted as read-only right now. You might have your memory card locked, or another program could be preventing access to Yoke.</p>
+        <p>A default layout can be copied to <tt>%1$s</tt>, but that folder is mounted as read-only right now. You might have your memory card locked, or another program could be preventing Yoke from writing files.</p>
         <p>Please fix the problem and click the button to try again.</p>
     </string>
     <string name="intro_onward">Copy default layout</string>
