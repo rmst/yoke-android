@@ -42,6 +42,7 @@
             android:id="@+id/spinner"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:prompt="@string/dropdown_connect_to"
             android:spinnerMode="dialog" />
 
     </LinearLayout>

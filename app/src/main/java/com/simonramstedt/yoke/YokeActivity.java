@@ -23,6 +23,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -41,7 +42,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private final String SERVICE_TYPE = "_yoke._udp.";
     private String NOTHING;
     private String ENTER_IP;
-    private WindowManager mWindowManager;
+    //private WindowManager mWindowManager;
     private NsdManager mNsdManager;
     private NsdServiceInfo mService;
     private DatagramSocket mSocket;
@@ -55,6 +56,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private Handler handler;
     private WebView wv;
     private Resources res;
+    private String url;
 
     private void log(String m) {
         if (BuildConfig.DEBUG)
@@ -90,9 +92,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         wv.getSettings().setJavaScriptEnabled(true);
         wv.addJavascriptInterface(new WebAppInterface(this), "Yoke");
 
-        // Get an instance of the WindowManager
-        mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-
         mNsdManager = (NsdManager) getSystemService(Context.NSD_SERVICE);
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -102,6 +101,10 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         NOTHING = res.getString(R.string.dropdown_nothing);
         ENTER_IP = res.getString(R.string.dropdown_enter_ip);
 
+        // Finding the gamepad:
+        url = "file://" + new File(getExternalFilesDir(null), "joypad/main.html").toString();
+
+        // Filling spinner with addresses to connect to:
         mTextView = (TextView) findViewById(R.id.textView);
 
         mSpinner = (Spinner) findViewById(R.id.spinner);
@@ -119,7 +122,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             }
         }
         mSpinner.setAdapter(mAdapter);
-        mSpinner.setPrompt(res.getString(R.string.dropdown_connect_to));
         mSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int pos, long l) {
@@ -203,7 +205,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 log(res.getString(R.string.log_nothing_selected));
             }
         });
-
     }
 
     @Override
@@ -321,8 +322,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             log(res.getString(R.string.log_open_udp_success));
             YokeActivity.this.runOnUiThread(() -> {
                 mTextView.setText(res.getString(R.string.toolbar_connected_to));
-
-                String url = "http://" + host + ":" + port + "/main.html";
                 wv.loadUrl(url);
                 log(String.format(res.getString(R.string.log_loading_url), url));
             });

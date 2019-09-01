@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_margin="25dp"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:textAlignment="gravity">
+
+    <ImageView
+        android:id="@+id/introImageView"
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:src="@mipmap/yoke" />
+
+    <TextView
+        android:id="@+id/introWelcome"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="" />
+
+    <TextView
+        android:id="@+id/introNotice"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/intro_loading" />
+
+    <Button
+        android:id="@+id/introButton"
+        android:layout_width="wrap_content"
+        android:layout_height="40sp"
+        android:text="@string/intro_onward"
+        android:onClick="onward" />
+
+</LinearLayout>
