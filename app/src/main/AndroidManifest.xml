@@ -14,17 +14,13 @@
                  android:supportsRtl="true"
                  android:allowBackup="true"
                  android:theme="@style/YokeTheme">
-        <activity android:name=".IntroActivity"
+        <activity android:name=".YokeActivity"
                   android:label="@string/app_name"
-                  android:noHistory="true">
+                  android:screenOrientation="landscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
-        <activity android:name=".YokeActivity"
-                  android:label="@string/app_name"
-                  android:screenOrientation="landscape">
         </activity>
     </application>
 </manifest>

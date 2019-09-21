@@ -4,28 +4,6 @@
     Until we find a comfortable way to interpolate them, the name for the app is hardcoded in several variables in the intro_ namespace. -->
     <string name="app_name">Yoke</string>
 
-    <!-- Strings for the welcome screen, which also copies the files for the WebView and checks the state of the external storage -->
-    <string name="intro_loading"><p>Loading…</p></string>
-    <string name="intro_welcome"><p>%1$s is a configurable gamepad to control another machine via Wi-Fi.</p></string>
-    <string name="intro_create_files">
-        <p>No gamepad layout could be found.</p>
-        <p>Please copy the default layout to <tt>%1$s</tt>. Then, click the button.</p>
-    </string>
-    <string name="intro_unavailable_storage">
-        <p>External storage is not available.</p>
-        <p>You may be missing a memory card, or another program could be preventing Yoke from accessing it. Please click the button to try again.</p>
-    </string>
-    <string name="intro_security_exception">
-        <p>External storage is mounted as read-write, but Yoke couldn\'t create folders in it.</p>
-        <p>Please check if another program could be preventing Yoke from writing files. Then, click the button to try again.</p>
-    </string>
-    <string name="intro_readonly_storage">
-        <p>No gamepad layout could be found.</p>
-        <p>A default layout can be copied to <tt>%1$s</tt>, but that folder is mounted as read-only right now. You might have your memory card locked, or another program could be preventing Yoke from writing files.</p>
-        <p>Please fix the problem and click the button to try again.</p>
-    </string>
-    <string name="intro_onward">Copy default layout</string>
-
     <!-- Strings for the toolbar, displayed as soon as the app is opened -->
     <string name="toolbar_connected_to">Connected to</string>
     <string name="toolbar_connect_to">Connect to</string>
