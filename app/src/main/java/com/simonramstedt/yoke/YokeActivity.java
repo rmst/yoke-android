@@ -7,6 +7,7 @@ import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.InputType;
@@ -23,13 +24,19 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.SocketException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,7 +49,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private final String SERVICE_TYPE = "_yoke._udp.";
     private String NOTHING;
     private String ENTER_IP;
-    //private WindowManager mWindowManager;
     private NsdManager mNsdManager;
     private NsdServiceInfo mService;
     private DatagramSocket mSocket;
@@ -54,8 +60,8 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private Spinner mSpinner;
     private ArrayAdapter<String> mAdapter;
     private Handler handler;
-    private WebView wv;
-    private Resources res;
+    protected WebView wv;
+    protected Resources res;
     private String url;
 
     private void log(String m) {
@@ -80,6 +86,68 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         }
     }
 
+    // https://stackoverflow.com/questions/15758856/android-how-to-download-file-from-webserver/
+    class DownloadFilesFromURL extends AsyncTask<String, String, String> {
+        public String errorMessage = null;
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            mTextView.setText(res.getString(R.string.toolbar_downloading));
+        }
+
+        @Override
+        protected String doInBackground(String... f_url) {
+            int count;
+            try {
+                int maximumIndex = f_url.length;
+                File outputFolder = getFilesDir();
+                for (int i=1; i < maximumIndex; i++) {
+                    URL url = new URL(f_url[0] + f_url[i]);
+                    InputStream input = new BufferedInputStream(url.openStream(), 8192);
+                    OutputStream output = new FileOutputStream(
+                        new File(outputFolder, f_url[i])
+                    );
+
+                    byte data[] = new byte[1024];
+
+                    long total = 0;
+                    while ((count = input.read(data)) != -1) {
+                        total += count;
+                        //publishProgress("" + (int) ((total * 100) / lengthOfFile));
+                        output.write(data, 0, count);
+                    }
+
+                    output.flush();
+                    output.close();
+                    input.close();
+                }
+            } catch (IOException e) {
+                errorMessage = e.getMessage();
+                log(String.format(res.getString(R.string.log_ioexception), errorMessage));
+                cancel(true);
+            }
+
+            return null;
+        }
+
+        protected void onProgressUpdate(String... progress) {
+            //pd.setProgress(Integer.parseInt(progress[0]));
+        }
+
+        @Override
+        protected void onPostExecute(String file_url) {
+            String url = "file://" + new File(getFilesDir(), "main.html").toString();
+            mTextView.setText(res.getString(R.string.toolbar_connected_to));
+            wv.loadUrl(url);
+            log(String.format(res.getString(R.string.log_loading_url), url));
+        }
+
+        @Override
+        protected void onCancelled() {
+            Toast.makeText(YokeActivity.this, "IOException: " + errorMessage, Toast.LENGTH_SHORT).show();
+        }
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -99,9 +167,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         res = getResources();
         NOTHING = res.getString(R.string.dropdown_nothing);
         ENTER_IP = res.getString(R.string.dropdown_enter_ip);
-
-        // Finding the gamepad:
-        url = "file://" + new File(getExternalFilesDir(null), "main.html").toString();
 
         // Filling spinner with addresses to connect to:
         mTextView = (TextView) findViewById(R.id.textView);
@@ -165,7 +230,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
                         if (invalid) {
                             mSpinner.setSelection(mAdapter.getPosition(NOTHING));
-                            Toast.makeText(YokeActivity.this, res.getString(R.string.toast_invalid_address), Toast.LENGTH_SHORT).show();
+                            Toast.makeText(YokeActivity.this, res.getString(R.string.toast_invalid_address), Toast.LENGTH_LONG).show();
 
                         } else {
                             mServiceNames.add(name);
@@ -320,9 +385,16 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
             log(res.getString(R.string.log_open_udp_success));
             YokeActivity.this.runOnUiThread(() -> {
-                mTextView.setText(res.getString(R.string.toolbar_connected_to));
-                wv.loadUrl(url);
-                log(String.format(res.getString(R.string.log_loading_url), url));
+                new DownloadFilesFromURL().execute(
+                    "http://" + host + ":" + port + "/",
+                    "base.css",
+                    "base.js",
+                    "dpad.css",
+                    "gamepad.css",
+                    "main.html",
+                    "racing.css",
+                    "testing.css"
+                );
             });
 
         } catch (SocketException | UnknownHostException e) {
@@ -336,8 +408,8 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         }
     }
 
-    public void onDiscoveryStarted(String regType) {
-        log(res.getString(R.string.log_discovery_started));
+    public void onDiscoveryStarted(String serviceType) {
+        log(String.format(res.getString(R.string.log_discovery_started), serviceType));
     }
 
     @Override
@@ -398,3 +470,4 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         vals_str = null;
     }
 }
+
