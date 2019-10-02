@@ -42,6 +42,8 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,18 +68,78 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private Spinner mSpinner;
     private ArrayAdapter<String> mAdapter;
     private Handler handler;
-    private String url;
     protected WebView wv;
     protected Resources res;
     protected File currentJoypadPath;
-    protected File futureJoypadPath;
-    protected File futureManifestPath;
     protected File currentMainPath;
+    protected File currentManifestPath;
+    protected File futureJoypadPath;
     protected File futureMainPath;
+    protected File futureManifestPath;
 
     private void log(String m) {
         if (BuildConfig.DEBUG)
             Log.d("Yoke", m);
+    }
+
+    protected boolean deleteByManifest(File joypadPath) {
+        String errorMessage;
+        try {
+            File manifestPath = new File(joypadPath, "manifest");
+            if (manifestPath.exists()) {
+                BufferedReader inputBR = new BufferedReader(
+                    new FileReader(manifestPath)
+                );
+                String line = "";
+                StringBuilder manifestSB = new StringBuilder();
+                while ((line = inputBR.readLine()) != null) {
+                    manifestSB.append(line).append("\n");
+                }
+                JSONObject manifestJSON = new JSONObject(manifestSB.toString());
+
+                JSONArray erasables = manifestJSON.getJSONArray("files");
+                for (int i = erasables.length() - 1; i >= 0; i--) {
+                    File currentFile = new File(joypadPath, erasables.getString(i));
+                    if (!currentFile.delete()) {
+                        throw new IOException(String.format(res.getString(R.string.log_could_not_delete), currentFile.toString()));
+                    }
+                }
+                erasables = manifestJSON.getJSONArray("folders");
+                String[] folders = new String[erasables.length()];
+                for (int i = folders.length - 1; i >= 0; i--) {
+                    folders[i] = erasables.getString(i);
+                }
+                Arrays.sort(folders, new ByFolderDepth());
+                for (int i = folders.length - 1; i >= 0; i--) {
+                    File currentFile = new File(joypadPath, folders[i]);
+                    if (!currentFile.delete()) {
+                        throw new IOException(String.format(res.getString(R.string.log_could_not_delete), currentFile));
+                    }
+                }
+                if (!manifestPath.delete()) {
+                    throw new IOException(String.format(res.getString(R.string.log_could_not_delete), manifestPath.toString()));
+                }
+            }
+            if (!joypadPath.delete()) {
+                throw new IOException(String.format(res.getString(R.string.log_could_not_delete), joypadPath.toString()));
+            }
+            return true;
+        } catch (IOException e) {
+            errorMessage = String.format(res.getString(R.string.log_could_not_delete), e.getMessage());
+            log(errorMessage);
+            Toast.makeText(YokeActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+            return false;
+        } catch (JSONException e) {
+            errorMessage = String.format(res.getString(R.string.log_json_exception), e.getLocalizedMessage());
+            log(errorMessage);
+            Toast.makeText(YokeActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+            return false;
+        } catch (SecurityException e) {
+            errorMessage = String.format(res.getString(R.string.log_security_exception), e.getLocalizedMessage());
+            log(errorMessage);
+            Toast.makeText(YokeActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+            return false;
+        }
     }
 
 
@@ -97,6 +159,13 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         }
     }
 
+    static class ByFolderDepth implements Comparator<String> {
+        public int compare(String f1, String f2) {
+            return (f1.toString().split(File.pathSeparator).length) -
+                (f2.toString().split(File.pathSeparator).length);
+        }
+    }
+
     // https://stackoverflow.com/questions/15758856/android-how-to-download-file-from-webserver/
     class DownloadFilesFromURL extends AsyncTask<String, String, String> {
         public String errorMessage = null;
@@ -105,6 +174,24 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         protected void onPreExecute() {
             super.onPreExecute();
             mTextView.setText(res.getString(R.string.toolbar_downloading));
+            try {
+                if (futureJoypadPath.exists() && !deleteByManifest(futureJoypadPath)) {
+                    throw new IOException();
+                }
+                log(String.format(res.getString(R.string.log_creating_folder), futureJoypadPath.getAbsolutePath()));
+                if (!futureJoypadPath.mkdirs()) {
+                    errorMessage = String.format(res.getString(R.string.log_could_not_create), futureJoypadPath.getAbsolutePath());
+                    log(errorMessage);
+                    Toast.makeText(YokeActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+                }
+            } catch (SecurityException e) {
+                errorMessage = String.format(res.getString(R.string.log_security_exception), e.getLocalizedMessage());
+                log(errorMessage);
+                Toast.makeText(YokeActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+            } catch (IOException e) {
+                //already reported, no need to do anything except abort the thread
+                cancel(true);
+            }
         }
 
         @Override
@@ -136,7 +223,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                     File newFolder = new File(futureJoypadPath, entries.getString(i));
                     log(String.format(res.getString(R.string.log_creating_folder), newFolder.getAbsolutePath()));
                     if (!newFolder.mkdirs()) {
-                        errorMessage = String.format(res.getString(R.string.log_could_not_create_folder), newFolder.getAbsolutePath());
+                        errorMessage = String.format(res.getString(R.string.log_could_not_create), newFolder.getAbsolutePath());
                         cancel(true);
                     }
                 }
@@ -181,6 +268,10 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
         @Override
         protected void onPostExecute(String file_url) {
+            if (currentJoypadPath.exists()) {
+                deleteByManifest(currentJoypadPath);
+            }
+            futureJoypadPath.renameTo(currentJoypadPath);
             String url = "file://" + new File(currentJoypadPath, "main.html").toString();
             mTextView.setText(res.getString(R.string.toolbar_connected_to));
             wv.loadUrl(url);
@@ -189,8 +280,11 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
         @Override
         protected void onCancelled() {
-            log(errorMessage);
-            Toast.makeText(YokeActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+            if (errorMessage != null) {
+                log(errorMessage);
+                Toast.makeText(YokeActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+            }
+            mTextView.setText(res.getString(R.string.toolbar_connected_to));
         }
     }
 
@@ -214,11 +308,12 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         ENTER_IP = res.getString(R.string.dropdown_enter_ip);
 
         // Paths for layout (can't define them until Android context is established)
-        currentJoypadPath = getFilesDir();
-        futureJoypadPath = getFilesDir();
-        futureManifestPath = new File(futureJoypadPath, "manifest");
+        currentJoypadPath = new File(getFilesDir(), "joypad");
         currentMainPath = new File(currentJoypadPath, "main.html");
+        currentManifestPath = new File(currentJoypadPath, "manifest");
+        futureJoypadPath = new File(getFilesDir(), "future");
         futureMainPath = new File(futureJoypadPath, "main.html");
+        futureManifestPath = new File(futureJoypadPath, "manifest");
 
         // Filling spinner with addresses to connect to:
         mTextView = (TextView) findViewById(R.id.textView);
@@ -417,7 +512,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     public void reconnect(View view) {
         String tgt = mSpinner.getSelectedItem().toString();
         if (tgt.equals(NOTHING)) {
-            Toast.makeText(YokeActivity.this, res.getString(R.string.toast_cant_reconnect_if_not_connected), Toast.LENGTH_SHORT).show();
+            Toast.makeText(YokeActivity.this, res.getString(R.string.toast_cant_reconnect_if_not_connected), Toast.LENGTH_LONG).show();
         } else {
             closeConnection();
             if (mServiceMap.containsKey(tgt)) {
@@ -436,17 +531,20 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             mSocket.connect(InetAddress.getByName(host), port);
 
             log(res.getString(R.string.log_open_udp_success));
-            YokeActivity.this.runOnUiThread(() -> {
-                new DownloadFilesFromURL().execute(
-                    "http://" + host + ":" + port + "/"
-                );
+            YokeActivity.this.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    new DownloadFilesFromURL().execute(
+                        "http://" + host + ":" + port + "/"
+                    );
+                }
             });
 
         } catch (SocketException | UnknownHostException e) {
             mSocket = null;
             YokeActivity.this.runOnUiThread(() -> {
                 mSpinner.setSelection(mAdapter.getPosition(NOTHING));
-                Toast.makeText(YokeActivity.this, String.format(res.getString(R.string.toast_could_not_connect), host, port), Toast.LENGTH_SHORT).show();
+                Toast.makeText(YokeActivity.this, String.format(res.getString(R.string.toast_could_not_connect), host, port), Toast.LENGTH_LONG).show();
             });
             log(res.getString(R.string.log_open_udp_error));
             e.printStackTrace();

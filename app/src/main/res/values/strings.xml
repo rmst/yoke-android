@@ -30,7 +30,9 @@
 
     <!-- Debug messages -->
     <string name="log_adding_address">Adding %1$s…</string>
-    <string name="log_could_not_create_folder">Could not create local folder %1$s</string>
+    <string name="log_could_not_create">Could not create %1$s</string>
+    <string name="log_could_not_delete">Could not delete %1$s</string>
+    <string name="log_could_not_rename">Could not rename %1$s</string>
     <string name="log_creating_folder">Creating local folder %1$s</string>
     <string name="log_directly_connecting">Connecting directly to IP address %1$s…</string>
     <string name="log_downloading_file">Downloading file to %1$s</string>
