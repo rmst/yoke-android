@@ -25,11 +25,14 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.SecurityException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -43,6 +46,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONException;
 
 
 public class YokeActivity extends Activity implements NsdManager.DiscoveryListener {
@@ -60,9 +66,14 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private Spinner mSpinner;
     private ArrayAdapter<String> mAdapter;
     private Handler handler;
+    private String url;
     protected WebView wv;
     protected Resources res;
-    private String url;
+    protected File currentJoypadPath;
+    protected File futureJoypadPath;
+    protected File futureManifestPath;
+    protected File currentMainPath;
+    protected File futureMainPath;
 
     private void log(String m) {
         if (BuildConfig.DEBUG)
@@ -98,22 +109,49 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
         @Override
         protected String doInBackground(String... f_url) {
-            int count;
+            StringBuilder manifestSB = new StringBuilder();
             try {
-                int maximumIndex = f_url.length;
-                File outputFolder = getFilesDir();
-                for (int i=1; i < maximumIndex; i++) {
-                    URL url = new URL(f_url[0] + f_url[i]);
-                    InputStream input = new BufferedInputStream(url.openStream(), 8192);
-                    OutputStream output = new FileOutputStream(
-                        new File(outputFolder, f_url[i])
-                    );
+                byte data[] = new byte[1024];
 
-                    byte data[] = new byte[1024];
+                URL url = new URL(f_url[0] + "manifest");
+                InputStream input = new BufferedInputStream(url.openStream(), 8192);
+                OutputStream output = new FileOutputStream(futureManifestPath);
+                int count;
+                while ((count = input.read(data)) != -1) {
+                    //TODO: warn that the manifest is downloading
+                    output.write(data, 0, count);
+                }
+                BufferedReader inputBR = new BufferedReader(
+                    new FileReader(futureManifestPath)
+                );
+                String line = "";
+                while ((line = inputBR.readLine()) != null) {
+                    manifestSB.append(line).append("\n");
+                }
+                JSONObject manifestJSON = new JSONObject(manifestSB.toString());
 
-                    long total = 0;
+                long totalBytes = manifestJSON.optLong("size", -1);
+                JSONArray entries = manifestJSON.getJSONArray("folders");
+                for (int i=entries.length() - 1; i >= 0; i--) {
+                    File newFolder = new File(futureJoypadPath, entries.getString(i));
+                    log(String.format(res.getString(R.string.log_creating_folder), newFolder.getAbsolutePath()));
+                    if (!newFolder.mkdirs()) {
+                        errorMessage = String.format(res.getString(R.string.log_could_not_create_folder), newFolder.getAbsolutePath());
+                        cancel(true);
+                    }
+                }
+
+                entries = manifestJSON.getJSONArray("files");
+                long cumulativeBytes = 0;
+                for (int i=entries.length() - 1; i >= 0; i--) {
+                    File newFile = new File(futureJoypadPath, entries.getString(i));
+                    log(String.format(res.getString(R.string.log_downloading_file), newFile.getAbsolutePath()));
+                    url = new URL(f_url[0] + entries.getString(i));
+                    input = new BufferedInputStream(url.openStream(), 8192);
+                    output = new FileOutputStream(newFile);
+
                     while ((count = input.read(data)) != -1) {
-                        total += count;
+                        cumulativeBytes += count;
                         //publishProgress("" + (int) ((total * 100) / lengthOfFile));
                         output.write(data, 0, count);
                     }
@@ -123,8 +161,14 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                     input.close();
                 }
             } catch (IOException e) {
-                errorMessage = e.getMessage();
-                log(String.format(res.getString(R.string.log_ioexception), errorMessage));
+                errorMessage = String.format(res.getString(R.string.log_io_exception), e.getLocalizedMessage());
+                cancel(true);
+            } catch (JSONException e) {
+                errorMessage = String.format(res.getString(R.string.log_json_exception), e.getLocalizedMessage());
+                log(manifestSB.toString());
+                cancel(true);
+            } catch (SecurityException e) {
+                errorMessage = String.format(res.getString(R.string.log_security_exception), e.getLocalizedMessage());
                 cancel(true);
             }
 
@@ -137,7 +181,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
         @Override
         protected void onPostExecute(String file_url) {
-            String url = "file://" + new File(getFilesDir(), "main.html").toString();
+            String url = "file://" + new File(currentJoypadPath, "main.html").toString();
             mTextView.setText(res.getString(R.string.toolbar_connected_to));
             wv.loadUrl(url);
             log(String.format(res.getString(R.string.log_loading_url), url));
@@ -145,7 +189,8 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
         @Override
         protected void onCancelled() {
-            Toast.makeText(YokeActivity.this, "IOException: " + errorMessage, Toast.LENGTH_SHORT).show();
+            log(errorMessage);
+            Toast.makeText(YokeActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -167,6 +212,13 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         res = getResources();
         NOTHING = res.getString(R.string.dropdown_nothing);
         ENTER_IP = res.getString(R.string.dropdown_enter_ip);
+
+        // Paths for layout (can't define them until Android context is established)
+        currentJoypadPath = getFilesDir();
+        futureJoypadPath = getFilesDir();
+        futureManifestPath = new File(futureJoypadPath, "manifest");
+        currentMainPath = new File(currentJoypadPath, "main.html");
+        futureMainPath = new File(futureJoypadPath, "main.html");
 
         // Filling spinner with addresses to connect to:
         mTextView = (TextView) findViewById(R.id.textView);
@@ -326,9 +378,9 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         try {
             mSocket.send(new DatagramPacket(msg, msg.length));
         } catch (IOException e) {
-            log(String.format(res.getString(R.string.log_send_error), e.getMessage()));
+            log(String.format(res.getString(R.string.log_send_error), e.getLocalizedMessage()));
         } catch (NullPointerException e) {
-            log(String.format(res.getString(R.string.log_send_error), e.getMessage()));
+            log(String.format(res.getString(R.string.log_send_error), e.getLocalizedMessage()));
         }
     }
 
@@ -346,7 +398,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             public void onServiceResolved(NsdServiceInfo serviceInfo) {
                 // check name again (could have changed in the mean time)
                 if (tgt.equals(serviceInfo.getServiceName())) {
-                    log(res.getString(R.string.log_service_resolve_success) + serviceInfo);
+                    log(String.format(res.getString(R.string.log_service_resolve_success), serviceInfo));
 
                     mService = serviceInfo;
                     openSocket(mService.getHost().getHostName(), mService.getPort());
@@ -386,14 +438,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             log(res.getString(R.string.log_open_udp_success));
             YokeActivity.this.runOnUiThread(() -> {
                 new DownloadFilesFromURL().execute(
-                    "http://" + host + ":" + port + "/",
-                    "base.css",
-                    "base.js",
-                    "dpad.css",
-                    "gamepad.css",
-                    "main.html",
-                    "racing.css",
-                    "testing.css"
+                    "http://" + host + ":" + port + "/"
                 );
             });
 

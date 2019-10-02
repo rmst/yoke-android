@@ -30,22 +30,27 @@
 
     <!-- Debug messages -->
     <string name="log_adding_address">Adding %1$s…</string>
+    <string name="log_could_not_create_folder">Could not create local folder %1$s</string>
+    <string name="log_creating_folder">Creating local folder %1$s</string>
     <string name="log_directly_connecting">Connecting directly to IP address %1$s…</string>
+    <string name="log_downloading_file">Downloading file to %1$s</string>
     <string name="log_discovery_error">Service discovery failed with error code %1$d.</string>
     <string name="log_discovery_started">Service discovery \"%1$s\" started.</string>
     <string name="log_discovery_stopped">Service discovery \"%1$s\" stopped.</string>
-    <string name="log_ioexception">I/O Exception: %1$s.</string>
+    <string name="log_io_exception">I/O Exception: %1$s.</string>
+    <string name="log_json_exception">JSON Exception: %1$s.</string>
     <string name="log_loading_url">Loading from %1$s</string>
     <string name="log_nothing_selected">Nothing selected.</string>
     <string name="log_open_udp_error">Failed to open UDP socket. Error message following:</string>
     <string name="log_open_udp_success">Connected.</string>
     <string name="log_opening_udp">Trying to open UDP socket to %1$s on port %2$d…</string>
+    <string name="log_security_exception">Security Exception: %1$s.</string>
     <string name="log_send_error">Error while sending message \"%1$s\".</string>
     <string name="log_service_found">Service found. </string>
     <string name="log_service_lost">Service lost. </string>
     <string name="log_service_not_null">SERVICE NOT NULL!!!</string>
     <string name="log_service_resolve_error">Resolve failed with error code %1$d.</string>
-    <string name="log_service_resolve_success">Resolve succeeded.</string>
+    <string name="log_service_resolve_success">Service \"%1$s\" succesfully resolved.</string>
     <string name="log_service_resolving">Resolving service \"%1$s\"…</string>
     <string name="log_service_targeting">New service target: \"%1$s\".</string>
     <string name="log_udp_closed">Connection closed.</string>
