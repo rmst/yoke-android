@@ -7,15 +7,21 @@
     <!-- Strings for the toolbar, displayed as soon as the app is opened -->
     <string name="toolbar_connected_to">Connected to</string>
     <string name="toolbar_connect_to">Connect to</string>
-    <!-- Reconnect button -->
+    <!-- Buttons -->
     <string name="toolbar_reconnect">Reconnect</string>
+    <string name="toolbar_overflow">More options</string>
     <!-- Downloading new layout -->
     <string name="toolbar_downloading">Downloading from</string>
 
+    <!-- Overflow menu (only an item for the moment) -->
+    <string name="menu_upgrade_layout">Upgrade layout</string>
+
     <!-- Toasts shown on user mistake -->
+    <string name="toast_cant_reconnect_if_not_connected">Please use the dropdown menu to connect to a machine.</string>
     <string name="toast_could_not_connect">Failed to connect to %1$s:%2$d.</string>
     <string name="toast_invalid_address">Invalid address.</string>
-    <string name="toast_cant_reconnect_if_not_connected">Please use the dropdown menu to connect to a machine.</string>
+    <!-- or on success: -->
+    <string name="toast_layout_succesfully_upgraded">Gaming layout succesfully upgraded.</string>
 
     <!-- These strings are displayed when the user opens the spinner to select a machine to connect to -->
     <string name="dropdown_connect_to">Connect to…</string>
@@ -32,7 +38,7 @@
     (If they're not going to be able to fix it, better be specific) -->
     <string name="error_discovery_failed">Service discovery failed with error code %1$d.</string>
     <string name="error_open_udp_error">Failed to open UDP socket to %1$s:%2$d.</string>
-    <string name="error_could_not_create">Could not create %1$s</string>
+    <string name="error_could_not_create_folder">Could not create folder %1$s</string>
     <string name="error_could_not_delete">Could not delete %1$s</string>
     <string name="error_could_not_rename">Could not rename %1$s</string>
     <string name="error_io_exception">Read/write error (IOException): %1$s.</string>
@@ -40,6 +46,7 @@
     <string name="error_security_exception">Security Manager prevents reading or writing (SecurityException): %1$s.</string>
     <string name="error_io_exception_while_sending">Error sending status (IOException). Reason: %1$s</string>
     <string name="error_null_pointer_exception_while_sending">Error sending status (NullPointerException). Reason: %1$s</string>
+    <string name="dismiss_error">OK</string>
 
     <!-- Debug messages -->
     <string name="log_adding_address">Adding %1$s…</string>

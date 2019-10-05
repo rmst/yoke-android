@@ -6,7 +6,6 @@
     android:orientation="vertical"
     android:background="@android:color/holo_blue_dark">
 
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="40sp"
@@ -25,6 +24,7 @@
             android:src="@drawable/baseline_refresh_24"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
+            android:layout_weight="0"
             android:contentDescription="@string/toolbar_reconnect"
             android:tooltipText="@string/toolbar_reconnect"
             android:onClick="reconnect" />
@@ -34,19 +34,35 @@
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_margin="3.5pt"
+            android:layout_weight="0"
             android:gravity="center"
-
             android:text="@string/toolbar_connect_to" />
 
         <Spinner
             android:id="@+id/spinner"
-            android:layout_width="match_parent"
+            android:layout_width="fill_parent"
             android:layout_height="match_parent"
+            android:layout_weight="1"
             android:prompt="@string/dropdown_connect_to"
             android:spinnerMode="dialog" />
 
+        <ImageButton
+            android:id="@+id/overflowButton"
+            android:src="@drawable/baseline_more_vert_24"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_weight="0"
+            android:contentDescription="@string/toolbar_overflow"
+            android:tooltipText="@string/toolbar_overflow"
+            android:onClick="showOverflowMenu" />
+
     </LinearLayout>
 
+    <ProgressBar
+        android:id="@+id/downloadProgress"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="8dp" />
 
     <WebView
         android:id="@+id/webView"
