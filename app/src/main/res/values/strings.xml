@@ -1,7 +1,7 @@
 <resources>
-    <!-- Name for the app (even if it's never translated or clarified, non-latin-alphaber languages might use a phonetic transcription)
+    <!-- Name for the app (even if it's never translated or clarified, non-latin-alphabet languages might use a phonetic transcription)
     Apparently XML variables can only be interpolated from the Java code.
-    Until we find a comfortable way to interpolate them, the name for the app is hardcoded in several variables in the intro_ namespace. -->
+    Until we find a comfortable way to interpolate them, the name for the app may be hardcoded in other variables. -->
     <string name="app_name">Yoke</string>
 
     <!-- Strings for the toolbar, displayed as soon as the app is opened -->
@@ -10,18 +10,17 @@
     <!-- Buttons -->
     <string name="toolbar_reconnect">Reconnect</string>
     <string name="toolbar_overflow">More options</string>
-    <!-- Downloading new layout -->
-    <string name="toolbar_downloading">Downloading from</string>
 
     <!-- Overflow menu (only an item for the moment) -->
-    <string name="menu_upgrade_layout">Upgrade layout</string>
+    <string name="menu_upgrade_layout">Upgrade gamepad</string>
 
     <!-- Toasts shown on user mistake -->
-    <string name="toast_cant_reconnect_if_not_connected">Please use the dropdown menu to connect to a machine.</string>
+    <string name="toast_connected_to_nowhere">Please use the dropdown menu to connect to a machine.</string>
     <string name="toast_could_not_connect">Failed to connect to %1$s:%2$d.</string>
+    <string name="toast_download_layout_first">You need to download a gamepad. Click the ⋮ menu button, then "%1$s", then ↻ "%2$s".</string>
     <string name="toast_invalid_address">Invalid address.</string>
     <!-- or on success: -->
-    <string name="toast_layout_succesfully_upgraded">Gaming layout succesfully upgraded.</string>
+    <string name="toast_layout_succesfully_upgraded">Gamepad succesfully upgraded.</string>
 
     <!-- These strings are displayed when the user opens the spinner to select a machine to connect to -->
     <string name="dropdown_connect_to">Connect to…</string>
@@ -43,9 +42,10 @@
     <string name="error_could_not_rename">Could not rename %1$s</string>
     <string name="error_io_exception">Read/write error (IOException): %1$s.</string>
     <string name="error_json_exception">Error parsing manifest (JSONException): %1$s.</string>
-    <string name="error_security_exception">Security Manager prevents reading or writing (SecurityException): %1$s.</string>
-    <string name="error_io_exception_while_sending">Error sending status (IOException). Reason: %1$s</string>
-    <string name="error_null_pointer_exception_while_sending">Error sending status (NullPointerException). Reason: %1$s</string>
+    <string name="error_connection_refused">Connection refused. Is Yoke running on your PC?</string>
+    <string name="error_security_exception">A Security Manager is preventing Yoke from reading or writing files (SecurityException).</string>
+    <string name="error_sending_security_exception">A Security Manager is preventing Yoke from communicating with your PC.</string>
+    <string name="error_service_null">Service null.</string>
     <string name="dismiss_error">OK</string>
 
     <!-- Debug messages -->
@@ -61,11 +61,11 @@
     <string name="log_opening_udp">Trying to open UDP socket to %1$s on port %2$d…</string>
     <string name="log_service_found">Service found. </string>
     <string name="log_service_lost">Service lost. </string>
-    <string name="log_service_not_null">SERVICE NOT NULL!!!</string>
     <string name="log_service_resolve_error">Resolve failed with error code %1$d.</string>
     <string name="log_service_resolve_success">Service \"%1$s\" succesfully resolved.</string>
     <string name="log_service_resolving">Resolving service \"%1$s\"…</string>
     <string name="log_service_targeting">New service target: \"%1$s\".</string>
+    <string name="log_spinner_selected">"%1$s" selected in the spinner.</string>
     <string name="log_udp_closed">Connection closed.</string>
 </resources>
 
