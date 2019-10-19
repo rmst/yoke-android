@@ -284,7 +284,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 logError(String.format(res.getString(R.string.error_io_exception), e.getLocalizedMessage()), e);
                 cancel(true);
             }
-            publishProgress(0L, SUCCESS);
+            (new Thread(()-> publishProgress(0L, SUCCESS))).start();
         }
 
         @Override
