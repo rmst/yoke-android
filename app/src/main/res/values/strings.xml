@@ -42,7 +42,7 @@
     <string name="error_could_not_rename">Could not rename %1$s</string>
     <string name="error_io_exception">Read/write error (IOException): %1$s.</string>
     <string name="error_json_exception">Error parsing manifest (JSONException): %1$s.</string>
-    <string name="error_connection_refused">Connection refused. Is Yoke running on your PC?</string>
+    <string name="error_connection_refused">Connection refused. Check if Yoke is running on your PC.</string>
     <string name="error_security_exception">A Security Manager is preventing Yoke from reading or writing files (SecurityException).</string>
     <string name="error_sending_security_exception">A Security Manager is preventing Yoke from communicating with your PC.</string>
     <string name="error_service_null">Service null.</string>
