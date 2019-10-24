@@ -188,7 +188,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             try {
                 byte data[] = new byte[1024];
 
-                URL url = new URL(f_url[0] + "manifest");
+                URL url = new URL(f_url[0] + "manifest.json");
                 InputStream input = new BufferedInputStream(url.openStream(), 8192);
                 OutputStream output = new FileOutputStream(futureManifestPath);
                 int count;
@@ -314,10 +314,10 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         // Paths for layout (can't define them until Android context is established)
         currentJoypadPath = new File(getFilesDir(), "joypad");
         currentMainPath = new File(currentJoypadPath, "main.html");
-        currentManifestPath = new File(currentJoypadPath, "manifest");
+        currentManifestPath = new File(currentJoypadPath, "manifest.json");
         futureJoypadPath = new File(getFilesDir(), "future");
         futureMainPath = new File(futureJoypadPath, "main.html");
-        futureManifestPath = new File(futureJoypadPath, "manifest");
+        futureManifestPath = new File(futureJoypadPath, "manifest.json");
 
         // Progress bar for download:
         mProgressBar = (ProgressBar) findViewById(R.id.downloadProgress);
