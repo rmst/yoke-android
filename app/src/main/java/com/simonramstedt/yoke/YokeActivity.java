@@ -370,6 +370,13 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
                     builder.setView(input);
 
+                    builder.setOnCancelListener(new DialogInterface.OnCancelListener() {
+                        public void onCancel(DialogInterface dialog) {
+                            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
+                            mTextView.setText(res.getString(R.string.toolbar_connect_to));
+                            currentHost = null;
+                        }
+                    });
                     builder.setPositiveButton(res.getString(R.string.enter_ip_ok), (dialog, which) -> {
                         String name = input.getText().toString();
 
@@ -402,10 +409,11 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                         }
                     });
                     builder.setNegativeButton(res.getString(R.string.enter_ip_cancel), (dialog, which) -> {
-                        mSpinner.setSelection(mAdapter.getPosition(NOTHING));
-                        mTextView.setText(res.getString(R.string.toolbar_connect_to));
-                        currentHost = null;
                         dialog.cancel();
+                    });
+                    builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                        @Override
+                        public void onDismiss(DialogInterface dialog) {dialog.cancel();}
                     });
 
                     builder.show();
