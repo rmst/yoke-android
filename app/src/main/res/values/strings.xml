@@ -1,0 +1,71 @@
+<resources>
+    <!-- Name for the app (even if it's never translated or clarified, non-latin-alphabet languages might use a phonetic transcription)
+    Apparently XML variables can only be interpolated from the Java code.
+    Until we find a comfortable way to interpolate them, the name for the app may be hardcoded in other variables. -->
+    <string name="app_name">Yoke</string>
+
+    <!-- Strings for the toolbar, displayed as soon as the app is opened -->
+    <string name="toolbar_connected_to">Connected to</string>
+    <string name="toolbar_connect_to">Connect to</string>
+    <!-- Buttons -->
+    <string name="toolbar_reconnect">Reconnect</string>
+    <string name="toolbar_overflow">More options</string>
+
+    <!-- Overflow menu (only an item for the moment) -->
+    <string name="menu_upgrade_layout">Upgrade gamepad</string>
+
+    <!-- Toasts shown on user mistake -->
+    <string name="toast_connected_to_nowhere">Please use the dropdown menu to connect to a machine.</string>
+    <string name="toast_could_not_connect">Failed to connect to %1$s:%2$d.</string>
+    <string name="toast_download_layout_first">You need to download a gamepad. Click the ⋮ menu button, then "%1$s", then ↻ "%2$s".</string>
+    <string name="toast_invalid_address">Invalid address.</string>
+    <!-- or on success: -->
+    <string name="toast_layout_succesfully_upgraded">Gamepad succesfully upgraded.</string>
+
+    <!-- These strings are displayed when the user opens the spinner to select a machine to connect to -->
+    <string name="dropdown_connect_to">Connect to…</string>
+    <string name="dropdown_nothing">→ nothing</string>
+    <string name="dropdown_enter_ip">→ new manual connection</string>
+
+    <!-- These strings are displayed when the user chooses to specify directly IP address and port -->
+    <string name="enter_ip_title">Enter IP address and port</string>
+    <string name="enter_ip_hint">e.g. 192.168.1.123:11111</string>
+    <string name="enter_ip_ok">OK</string>
+    <string name="enter_ip_cancel">Cancel</string>
+
+    <!-- Error messages. The same string is displayed to the user than in the logcat.
+    (If they're not going to be able to fix it, better be specific) -->
+    <string name="error_discovery_failed">Service discovery failed with error code %1$d.</string>
+    <string name="error_open_udp_error">Failed to open UDP socket to %1$s:%2$d.</string>
+    <string name="error_could_not_create_folder">Could not create folder %1$s</string>
+    <string name="error_could_not_delete">Could not delete %1$s</string>
+    <string name="error_could_not_rename">Could not rename %1$s</string>
+    <string name="error_io_exception">Read/write error (IOException): %1$s.</string>
+    <string name="error_json_exception">Error parsing manifest (JSONException): %1$s.</string>
+    <string name="error_connection_refused">Connection refused. Check if Yoke is running on your PC.</string>
+    <string name="error_security_exception">A Security Manager is preventing Yoke from reading or writing files (SecurityException).</string>
+    <string name="error_sending_security_exception">A Security Manager is preventing Yoke from communicating with your PC.</string>
+    <string name="error_service_null">Service null.</string>
+    <string name="dismiss_error">OK</string>
+
+    <!-- Debug messages -->
+    <string name="log_adding_address">Adding %1$s…</string>
+    <string name="log_creating_folder">Creating local folder %1$s</string>
+    <string name="log_directly_connecting">Connecting directly to IP address %1$s…</string>
+    <string name="log_downloading_file">Downloading file to %1$s</string>
+    <string name="log_discovery_started">Service discovery \"%1$s\" started.</string>
+    <string name="log_discovery_stopped">Service discovery \"%1$s\" stopped.</string>
+    <string name="log_loading_url">Loading from %1$s</string>
+    <string name="log_nothing_selected">Nothing selected.</string>
+    <string name="log_open_udp_success">Connected.</string>
+    <string name="log_opening_udp">Trying to open UDP socket to %1$s on port %2$d…</string>
+    <string name="log_service_found">Service found. </string>
+    <string name="log_service_lost">Service lost. </string>
+    <string name="log_service_resolve_error">Resolve failed with error code %1$d.</string>
+    <string name="log_service_resolve_success">Service \"%1$s\" succesfully resolved.</string>
+    <string name="log_service_resolving">Resolving service \"%1$s\"…</string>
+    <string name="log_service_targeting">New service target: \"%1$s\".</string>
+    <string name="log_spinner_selected">"%1$s" selected in the spinner.</string>
+    <string name="log_udp_closed">Connection closed.</string>
+</resources>
+

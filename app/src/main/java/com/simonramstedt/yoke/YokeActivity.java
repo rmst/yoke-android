@@ -3,86 +3,145 @@ package com.simonramstedt.yoke;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
+import android.content.res.Resources;
 import android.net.nsd.NsdManager;
+import android.net.nsd.NsdServiceInfo;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.PowerManager;
-import android.os.PowerManager.WakeLock;
 import android.text.InputType;
 import android.util.Log;
 import android.view.Display;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.net.nsd.NsdServiceInfo;
 import android.widget.EditText;
+import android.widget.PopupMenu;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.SecurityException;
+import java.lang.StackTraceElement;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.SocketException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Timer;
-import java.util.concurrent.locks.ReentrantLock;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONException;
 
 
 public class YokeActivity extends Activity implements NsdManager.DiscoveryListener {
-    private static final String SERVICE_TYPE = "_yoke._udp.";
-    private static final String NOTHING = "> nothing ";
-    private static final String ENTER_IP = "> new manual connection";
-    private PowerManager mPowerManager;
-    private WindowManager mWindowManager;
-    private Display mDisplay;
-    private WakeLock mWakeLock;
-    private ServerSocket mServerSocket;
+    private final String SERVICE_TYPE = "_yoke._udp.";
+    private String NOTHING;
+    private String ENTER_IP;
     private NsdManager mNsdManager;
-    private NsdServiceInfo mNsdServiceInfo;
     private NsdServiceInfo mService;
-    private final ReentrantLock resolving = new ReentrantLock();
     private DatagramSocket mSocket;
     private String vals_str = null;
-    private Timer mTimer;
     private Map<String, NsdServiceInfo> mServiceMap = new HashMap<>();
     private List<String> mServiceNames = new ArrayList<>();
     private SharedPreferences sharedPref;
     private TextView mTextView;
     private Spinner mSpinner;
+    private ProgressBar mProgressBar;
     private ArrayAdapter<String> mAdapter;
-    private String mTarget = "";
     private Handler handler;
     private WebView wv;
+    private Resources res;
+    private File currentJoypadPath;
+    private File currentMainPath;
+    private File currentManifestPath;
+    private File futureJoypadPath;
+    private File futureMainPath;
+    private File futureManifestPath;
+    private String currentHost = null;
+    private int currentPort = 0; // the value is irrelevant if currentHost is null
 
     private void log(String m) {
         if (BuildConfig.DEBUG)
             Log.d("Yoke", m);
     }
 
+    private void logError(String m, Exception e) {
+        Log.e("Yoke", m);
+        if (e != null) {
+            StringBuilder sb = new StringBuilder();
+            for (StackTraceElement element : e.getStackTrace()) {
+                sb.append(element.toString());
+                sb.append("\n");
+            }
+            Log.e("Yoke", sb.toString());
+        }
+        YokeActivity.this.runOnUiThread(() -> {
+            AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this);
+            builder.setMessage(m);
+            builder.setNegativeButton(R.string.dismiss_error, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int id) {
+                    dialog.cancel();
+                }
+            });
+            builder.show();
+        });
+    }
+
+    private void deleteRecursively(File joypadPath) throws IOException {
+        // Deleting a folder without emptying it first fails or raises an error,
+        // and there is no one-liner in this version to empty its contents. So:
+        ArrayList<File> erasables = new ArrayList<>();
+        erasables.add(joypadPath);
+        for (int i = 0; i < erasables.size(); i++) {
+            // don't optimize the line above. The ArrayList will be modified at every iteration.
+            File folder = erasables.get(i);
+            if (folder.isDirectory()) {
+                for (String entry : folder.list()) {
+                    erasables.add(new File(folder, entry));
+                }
+            }
+        }
+        // Files should already be ordered by depth, so we iterate backwards:
+        for (int i = erasables.size() - 1; i >= 0; i--) {
+            File currentFile = erasables.get(i);
+            if (!currentFile.delete()) {
+                throw new IOException(String.format(res.getString(R.string.error_could_not_delete), currentFile));
+            }
+        }
+    }
 
     class WebAppInterface {
         Context mContext;
 
-        /** Instantiate the interface and set the context */
+        // Instantiate the interface and set the context
         WebAppInterface(Context c) {
             mContext = c;
         }
 
-        /** Show a toast from the web page */
+        // Webpage uses this method to update joypad state:
         @JavascriptInterface
         public void update_vals(String vals) {
             vals_str = vals;
@@ -90,6 +149,148 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         }
     }
 
+    // https://stackoverflow.com/questions/15758856/android-how-to-download-file-from-webserver/
+    class DownloadFilesFromURL extends AsyncTask<String, Long, Void> {
+
+        private final long INDETERMINATE = -1L;
+        private final long DETERMINATE = -2L;
+        private final long SUCCESS = -4L;
+
+        private final int MAX_PROGRESS = 1000;
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            try {
+                if (futureJoypadPath.exists()) {
+                    deleteRecursively(futureJoypadPath);
+                }
+                log(String.format(
+                    res.getString(R.string.log_creating_folder), futureJoypadPath.getAbsolutePath()
+                ));
+                if (!futureJoypadPath.mkdirs()) {
+                    throw new IOException(String.format(
+                        res.getString(R.string.error_could_not_create_folder), futureJoypadPath.getAbsolutePath()
+                    ));
+                }
+            } catch (SecurityException e) {
+                logError(res.getString(R.string.error_security_exception), e);
+                cancel(true);
+            } catch (IOException e) {
+                logError(e.getLocalizedMessage(), e);
+                cancel(true);
+            }
+        }
+
+        @Override
+        protected Void doInBackground(String... f_url) {
+            StringBuilder manifestSB = new StringBuilder();
+            try {
+                byte data[] = new byte[1024];
+
+                URL url = new URL(f_url[0] + "manifest.json");
+                InputStream input = new BufferedInputStream(url.openStream(), 8192);
+                OutputStream output = new FileOutputStream(futureManifestPath);
+                int count;
+                publishProgress(0L, INDETERMINATE);
+                while ((count = input.read(data)) != -1) {
+                    output.write(data, 0, count);
+                }
+                BufferedReader inputBR = new BufferedReader(
+                    new FileReader(futureManifestPath)
+                );
+                String line = "";
+                while ((line = inputBR.readLine()) != null) {
+                    manifestSB.append(line).append("\n");
+                }
+                JSONObject manifestJSON = new JSONObject(manifestSB.toString());
+
+                long totalBytes = manifestJSON.optLong("size", INDETERMINATE);
+                if (totalBytes != INDETERMINATE)
+                    publishProgress(0L, DETERMINATE);
+                JSONArray entries = manifestJSON.getJSONArray("folders");
+                for (int i = 0, length = entries.length(); i < length; i++) {
+                    File newFolder = new File(futureJoypadPath, entries.getString(i));
+                    log(String.format(res.getString(R.string.log_creating_folder), newFolder.getAbsolutePath()));
+                    if (!newFolder.mkdirs()) {
+                        throw new IOException(String.format(
+                            res.getString(R.string.error_could_not_create_folder), newFolder.getAbsolutePath()
+                        ));
+                    }
+                }
+
+                entries = manifestJSON.getJSONArray("files");
+                long cumulativeBytes = 0;
+                for (int i = 0, length=entries.length(); i < length; i++) {
+                    File newFile = new File(futureJoypadPath, entries.getString(i));
+                    log(String.format(res.getString(R.string.log_downloading_file), newFile.getAbsolutePath()));
+                    input = new BufferedInputStream(new URL(f_url[0] + entries.getString(i)).openStream(), 8192);
+                    output = new FileOutputStream(newFile);
+
+                    while ((count = input.read(data)) != -1) {
+                        cumulativeBytes += count;
+                        output.write(data, 0, count);
+                        publishProgress(cumulativeBytes, totalBytes);
+                    }
+
+                    output.flush();
+                    output.close();
+                    input.close();
+                }
+            } catch (IOException e) {
+                if (e.getLocalizedMessage().contains(" ECONNREFUSED ")) {
+                    logError(res.getString(R.string.error_connection_refused), e);
+                } else {
+                    logError(e.getLocalizedMessage(), e);
+                }
+                cancel(true);
+            } catch (JSONException e) {
+                logError(String.format(res.getString(R.string.error_json_exception), e.getLocalizedMessage()), e);
+                cancel(true);
+            } catch (SecurityException e) {
+                logError(res.getString(R.string.error_security_exception), e);
+                cancel(true);
+            }
+            return null;
+        }
+
+        protected void onProgressUpdate(Long... progress) {
+            if (progress[1] == INDETERMINATE) {
+                mProgressBar.setIndeterminate(true);
+            } else if (progress[1] == DETERMINATE) {
+                mProgressBar.setIndeterminate(false);
+                mProgressBar.setProgress(0);
+                mProgressBar.setMax((int)MAX_PROGRESS);
+            } else if (progress[1] == SUCCESS) {
+                mProgressBar.setIndeterminate(false);
+                mProgressBar.setProgress(0);
+                Toast.makeText(YokeActivity.this, res.getString(R.string.toast_layout_succesfully_upgraded), Toast.LENGTH_LONG).show();
+            } else {
+                mProgressBar.setProgress((int)(progress[0]*MAX_PROGRESS/progress[1]));
+            }
+        }
+
+        @Override
+        protected void onPostExecute(Void v) {
+            try {
+                if (currentJoypadPath.exists()) {
+                    deleteRecursively(currentJoypadPath);
+                }
+                if (!futureJoypadPath.renameTo(currentJoypadPath)) {
+                    logError(String.format(res.getString(R.string.error_could_not_rename), futureJoypadPath.getAbsolutePath()), null);
+                    cancel(true);
+                }
+            } catch (IOException e) {
+                logError(String.format(res.getString(R.string.error_io_exception), e.getLocalizedMessage()), e);
+                cancel(true);
+            }
+            (new Thread(()-> publishProgress(0L, SUCCESS))).start();
+        }
+
+        @Override
+        protected void onCancelled() {
+        }
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -98,21 +299,30 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         setContentView(R.layout.main_wv);
 
         wv = findViewById(R.id.webView);
-
         wv.getSettings().setJavaScriptEnabled(true);
         wv.addJavascriptInterface(new WebAppInterface(this), "Yoke");
-
-        // Get an instance of the PowerManager
-        mPowerManager = (PowerManager) getSystemService(POWER_SERVICE);
-
-        // Get an instance of the WindowManager
-        mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        mDisplay = mWindowManager.getDefaultDisplay();
 
         mNsdManager = (NsdManager) getSystemService(Context.NSD_SERVICE);
 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+        // Localization. TODO: detect NOTHING and MANUAL CONNECTION buttons by id, not by content.
+        res = getResources();
+        NOTHING = res.getString(R.string.dropdown_nothing);
+        ENTER_IP = res.getString(R.string.dropdown_enter_ip);
+
+        // Paths for layout (can't define them until Android context is established)
+        currentJoypadPath = new File(getFilesDir(), "joypad");
+        currentMainPath = new File(currentJoypadPath, "main.html");
+        currentManifestPath = new File(currentJoypadPath, "manifest.json");
+        futureJoypadPath = new File(getFilesDir(), "future");
+        futureMainPath = new File(futureJoypadPath, "main.html");
+        futureManifestPath = new File(futureJoypadPath, "manifest.json");
+
+        // Progress bar for download:
+        mProgressBar = (ProgressBar) findViewById(R.id.downloadProgress);
+
+        // Filling spinner with addresses to connect to:
         mTextView = (TextView) findViewById(R.id.textView);
 
         mSpinner = (Spinner) findViewById(R.id.spinner);
@@ -126,16 +336,16 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             if (!adr.isEmpty()) {
                 mAdapter.add(adr);
                 mServiceNames.add(adr);
-                log("adding " + adr);
+                log(String.format(res.getString(R.string.log_adding_address), adr));
             }
         }
         mSpinner.setAdapter(mAdapter);
-        mSpinner.setPrompt("Connect to ...");
         mSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int pos, long l) {
 
                 String tgt = parent.getItemAtPosition(pos).toString();
+                log(String.format(res.getString(R.string.log_spinner_selected), tgt));
 
                 // clean up old target if no longer available
                 String oldtgt = mSpinner.getSelectedItem().toString();
@@ -152,15 +362,22 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
                 } else if (tgt.equals(ENTER_IP)) {
                     AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this);
-                    builder.setTitle("Enter ip address and port");
+                    builder.setTitle(res.getString(R.string.enter_ip_title));
 
                     final EditText input = new EditText(YokeActivity.this);
                     input.setInputType(InputType.TYPE_CLASS_TEXT);
-                    input.setHint("e.g. 192.168.1.123:11111");
+                    input.setHint(res.getString(R.string.enter_ip_hint));
 
                     builder.setView(input);
 
-                    builder.setPositiveButton("OK", (dialog, which) -> {
+                    builder.setOnCancelListener(new DialogInterface.OnCancelListener() {
+                        public void onCancel(DialogInterface dialog) {
+                            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
+                            mTextView.setText(res.getString(R.string.toolbar_connect_to));
+                            currentHost = null;
+                        }
+                    });
+                    builder.setPositiveButton(res.getString(R.string.enter_ip_ok), (dialog, which) -> {
                         String name = input.getText().toString();
 
                         boolean invalid = name.split(":").length != 2;
@@ -174,8 +391,10 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                         }
 
                         if (invalid) {
+                            mTextView.setText(res.getString(R.string.toolbar_connect_to));
                             mSpinner.setSelection(mAdapter.getPosition(NOTHING));
-                            Toast.makeText(YokeActivity.this, "Invalid address", Toast.LENGTH_SHORT).show();
+                            currentHost = null;
+                            Toast.makeText(YokeActivity.this, res.getString(R.string.toast_invalid_address), Toast.LENGTH_LONG).show();
 
                         } else {
                             mServiceNames.add(name);
@@ -189,17 +408,17 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                             editor.apply();
                         }
                     });
-                    builder.setNegativeButton("Cancel", (dialog, which) -> {
-                        mSpinner.setSelection(mAdapter.getPosition(NOTHING));
+                    builder.setNegativeButton(res.getString(R.string.enter_ip_cancel), (dialog, which) -> {
                         dialog.cancel();
+                    });
+                    builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                        @Override
+                        public void onDismiss(DialogInterface dialog) {dialog.cancel();}
                     });
 
                     builder.show();
                 } else {
-                    log("new target " + tgt);
-
-                    if (mService != null)  // remove
-                        log("SERVICE NOT NULL!!!");
+                    log(String.format(res.getString(R.string.log_service_targeting), tgt));
 
                     if (mServiceMap.containsKey(tgt)) {
                         connectToService(tgt);
@@ -211,10 +430,9 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
             @Override
             public void onNothingSelected(AdapterView<?> adapterView) {
-                log("nothing selected");
+                log(res.getString(R.string.log_nothing_selected));
             }
         });
-
     }
 
     @Override
@@ -248,6 +466,20 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         handler = null;
     }
 
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_IMMERSIVE
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        }
+    }
+
     private void update() {
         if (mSocket != null && vals_str != null) {
             send(vals_str.getBytes());
@@ -257,28 +489,40 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     public void send(byte[] msg) {
         try {
             mSocket.send(new DatagramPacket(msg, msg.length));
+        } catch (SecurityException e) {
+            logError(res.getString(R.string.error_sending_security_exception), e);
+            closeConnection();
+            mTextView.setText(res.getString(R.string.toolbar_connect_to));
+            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
         } catch (IOException e) {
-            log("Send error: " + e.getMessage());
-        } catch (NullPointerException e) {
-            log("Send error " + e.getMessage());
+            if (e.getLocalizedMessage().contains(" ECONNREFUSED ")) {
+                logError(res.getString(R.string.error_connection_refused), e);
+            } else {
+                logError(e.getLocalizedMessage(), e);
+            }
+            closeConnection();
+            mTextView.setText(res.getString(R.string.toolbar_connect_to));
+            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
         }
     }
 
     public void connectToService(String tgt) {
         NsdServiceInfo service = mServiceMap.get(tgt);
-        log("Resolving Service: " + service.getServiceType());
+        log(String.format(res.getString(R.string.log_service_resolving), service.getServiceType()));
         mNsdManager.resolveService(service, new NsdManager.ResolveListener() {
             @Override
             public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
-                log("Resolve failed: " + errorCode);
+                logError(String.format(res.getString(R.string.log_service_resolve_error), errorCode), null);
+                mTextView.setText(res.getString(R.string.toolbar_connect_to));
                 mSpinner.setSelection(mAdapter.getPosition(NOTHING));
+                currentHost = null;
             }
 
             @Override
             public void onServiceResolved(NsdServiceInfo serviceInfo) {
                 // check name again (could have changed in the mean time)
                 if (tgt.equals(serviceInfo.getServiceName())) {
-                    log("Resolve Succeeded. " + serviceInfo);
+                    log(String.format(res.getString(R.string.log_service_resolve_success), serviceInfo));
 
                     mService = serviceInfo;
                     openSocket(mService.getHost().getHostName(), mService.getPort());
@@ -289,45 +533,92 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     }
 
     public void connectToAddress(String tgt) {
-        log("Connecting directly ip address " + tgt);
+        log(String.format(res.getString(R.string.log_directly_connecting), tgt));
         String[] addr = tgt.split(":");
         (new Thread(()-> openSocket(addr[0], Integer.parseInt(addr[1])))).start();
     }
 
+    public void reconnect(View view) {
+        String tgt = mSpinner.getSelectedItem().toString();
+        if (currentHost == null) {
+            Toast.makeText(YokeActivity.this, res.getString(R.string.toast_connected_to_nowhere), Toast.LENGTH_LONG).show();
+        } else {
+            log(res.getString(R.string.log_udp_closed));
+            mSocket.close();
+            mSocket = null;
+            wv.loadUrl("about:blank");
+            vals_str = null;
+            (new Thread(()-> openSocket(currentHost, currentPort))).start();
+        }
+    }
+
+    public void showOverflowMenu(View view) {
+        PopupMenu popup = new PopupMenu(this, view);
+        popup.inflate(R.menu.overflow);
+        popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+            public boolean onMenuItemClick(MenuItem item) {
+                switch (item.getItemId()) {
+                    case R.id.upgradeLayout:
+                        if (currentHost != null) {
+                            new DownloadFilesFromURL().execute(
+                                "http://" + currentHost + ":" + Integer.toString(currentPort) + "/"
+                            );
+                        } else {
+                            Toast.makeText(YokeActivity.this,
+                                res.getString(R.string.toast_connected_to_nowhere), Toast.LENGTH_LONG
+                            ).show();
+                        }
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        });
+        popup.show();
+    }
+
+
     public void openSocket(String host, int port) {
-        log("Trying to open UDP socket to " + host + " on port " + port);
+        currentHost = host;
+        currentPort = port;
+        log(String.format(res.getString(R.string.log_opening_udp), host, port));
 
         try {
             mSocket = new DatagramSocket(0);
             mSocket.connect(InetAddress.getByName(host), port);
 
-            log("Connected");
+            log(res.getString(R.string.log_open_udp_success));
+            String url = "file://" + currentMainPath.toString();
             YokeActivity.this.runOnUiThread(() -> {
-                mTextView.setText("Connected to");
-
-                String url = "http://" + host + ":" + port + "/main.html";
-                wv.loadUrl(url);
-                log("Loading from " + url);
+                mTextView.setText(res.getString(R.string.toolbar_connected_to));
+                if (currentMainPath.exists()) {
+                    wv.loadUrl(url);
+                } else {
+                    Toast.makeText(YokeActivity.this, String.format(
+                        res.getString(R.string.toast_download_layout_first),
+                        res.getString(R.string.menu_upgrade_layout),
+                        res.getString(R.string.toolbar_reconnect)
+                    ), Toast.LENGTH_LONG).show();
+                }
             });
+            log(String.format(res.getString(R.string.log_loading_url), url));
 
         } catch (SocketException | UnknownHostException e) {
-            mSocket = null;
+            mSocket = null; currentHost = null;
             YokeActivity.this.runOnUiThread(() -> {
                 mSpinner.setSelection(mAdapter.getPosition(NOTHING));
-                Toast.makeText(YokeActivity.this, "Failed to connect to " + host + ':' + port, Toast.LENGTH_SHORT).show();
             });
-            log("Failed to open UDP socket (error message following)");
-            e.printStackTrace();
+            logError(String.format(res.getString(R.string.error_open_udp_error), host, port), e);
         }
     }
 
-    public void onDiscoveryStarted(String regType) {
-        log("Service discovery started");
+    public void onDiscoveryStarted(String serviceType) {
+        log(String.format(res.getString(R.string.log_discovery_started), serviceType));
     }
 
     @Override
     public void onServiceFound(NsdServiceInfo service) {
-        log("Service found " + service);
+        log(res.getString(R.string.log_service_found) + service);
         mServiceMap.put(service.getServiceName(), service);
         mServiceNames.add(service.getServiceName());
         this.runOnUiThread(() -> {
@@ -342,7 +633,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
     @Override
     public void onServiceLost(NsdServiceInfo service) {
-        log("Service lost " + service);
+        log(res.getString(R.string.log_service_lost) + service);
         mServiceMap.remove(service.getServiceName());
         mServiceNames.remove(service.getServiceName());
         this.runOnUiThread(() -> {
@@ -356,28 +647,31 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
     @Override
     public void onDiscoveryStopped(String serviceType) {
-        log("Discovery stopped: " + serviceType);
+        log(String.format(res.getString(R.string.log_discovery_stopped), serviceType));
     }
 
     @Override
     public void onStartDiscoveryFailed(String serviceType, int errorCode) {
-        log("Discovery failed: Error code:" + errorCode);
+        logError(String.format(res.getString(R.string.error_discovery_failed), errorCode), null);
         mNsdManager.stopServiceDiscovery(this);
     }
 
     @Override
     public void onStopDiscoveryFailed(String serviceType, int errorCode) {
-        log("Discovery failed: Error code:" + errorCode);
+        logError(String.format(res.getString(R.string.error_discovery_failed), errorCode), null);
         mNsdManager.stopServiceDiscovery(this);
     }
 
     private void closeConnection() {
         mService = null;
         if (mSocket != null) {
-            log("Connection closed");
-            mTextView.setText(" Connect to ");
+            log(res.getString(R.string.log_udp_closed));
             mSocket.close();
             mSocket = null;
         }
+        currentHost = null;
+        wv.loadUrl("about:blank");
+        vals_str = null;
     }
 }
+
