@@ -65,7 +65,7 @@
     <string name="log_service_resolve_success">Serviço \"%1$s\" resolvido com sucesso.</string>
     <string name="log_service_resolving">Resolvendo serviço \"%1$s\"…</string>
     <string name="log_service_targeting">Novo serviço alvo: \"%1$s\".</string>
-    <string name="log_spinner_selected">"%1$s" selected in the spinner.</string>
+    <string name="log_spinner_selected">"%1$s" selecionado no girador.</string>
     <string name="log_udp_closed">Conexão fechada.</string>
 </resources>
 
