@@ -46,6 +46,7 @@ import java.net.SocketException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -63,7 +64,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private NsdManager mNsdManager;
     private NsdServiceInfo mService;
     private DatagramSocket mSocket;
-    private String vals_str = null;
+    private byte[] vals_buffer = null;
     private Map<String, NsdServiceInfo> mServiceMap = new HashMap<>();
     private List<String> mServiceNames = new ArrayList<>();
     private SharedPreferences sharedPref;
@@ -142,9 +143,10 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         }
 
         // Webpage uses this method to update joypad state:
+        // TODO: Investigate a WebMessagePort-based solution which works for Lollipop and older
         @JavascriptInterface
         public void update_vals(String vals) {
-            vals_str = vals;
+            vals_buffer = vals.getBytes(Charset.forName("ISO-8859-1"));
             update();
         }
     }
@@ -481,8 +483,8 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     }
 
     private void update() {
-        if (mSocket != null && vals_str != null) {
-            send(vals_str.getBytes());
+        if (mSocket != null && vals_buffer != null) {
+            send(vals_buffer);
         }
     }
 
@@ -547,7 +549,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             mSocket.close();
             mSocket = null;
             wv.loadUrl("about:blank");
-            vals_str = null;
+            vals_buffer = null;
             (new Thread(()-> openSocket(currentHost, currentPort))).start();
         }
     }
@@ -671,7 +673,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         }
         currentHost = null;
         wv.loadUrl("about:blank");
-        vals_str = null;
+        vals_buffer = null;
     }
 }
 
