@@ -156,7 +156,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
         private final long INDETERMINATE = -1L;
         private final long DETERMINATE = -2L;
-        private final long SUCCESS = -4L;
+        private final long OVER = -4L;
 
         private final int MAX_PROGRESS = 1000;
 
@@ -245,12 +245,15 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 } else {
                     logError(e.getLocalizedMessage(), e);
                 }
+                publishProgress(0L, OVER);
                 cancel(true);
             } catch (JSONException e) {
                 logError(String.format(res.getString(R.string.error_json_exception), e.getLocalizedMessage()), e);
+                publishProgress(0L, OVER);
                 cancel(true);
             } catch (SecurityException e) {
                 logError(res.getString(R.string.error_security_exception), e);
+                publishProgress(0L, OVER);
                 cancel(true);
             }
             return null;
@@ -259,13 +262,16 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         protected void onProgressUpdate(Long... progress) {
             if (progress[1] == INDETERMINATE) {
                 mProgressBar.setIndeterminate(true);
+                mProgressBar.setVisibility(View.VISIBLE);
             } else if (progress[1] == DETERMINATE) {
                 mProgressBar.setIndeterminate(false);
                 mProgressBar.setProgress(0);
                 mProgressBar.setMax((int)MAX_PROGRESS);
-            } else if (progress[1] == SUCCESS) {
+                mProgressBar.setVisibility(View.VISIBLE);
+            } else if (progress[1] == OVER) {
                 mProgressBar.setIndeterminate(false);
                 mProgressBar.setProgress(0);
+                mProgressBar.setVisibility(View.INVISIBLE);
                 Toast.makeText(YokeActivity.this, res.getString(R.string.toast_layout_succesfully_upgraded), Toast.LENGTH_LONG).show();
             } else {
                 mProgressBar.setProgress((int)(progress[0]*MAX_PROGRESS/progress[1]));
@@ -286,7 +292,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 logError(String.format(res.getString(R.string.error_io_exception), e.getLocalizedMessage()), e);
                 cancel(true);
             }
-            (new Thread(()-> publishProgress(0L, SUCCESS))).start();
+            (new Thread(()-> publishProgress(0L, OVER))).start();
         }
 
         @Override
