@@ -149,6 +149,18 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             vals_buffer = vals.getBytes(Charset.forName("ISO-8859-1"));
             update();
         }
+        @JavascriptInterface
+        public void alert(String m) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this, R.style.WebviewPrompt);
+            builder.setTitle(R.string.alert_from_webview);
+            builder.setMessage(m);
+            builder.setNegativeButton(R.string.dismiss_alert, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int id) {
+                    dialog.cancel();
+                }
+            });
+            builder.show();
+        }
     }
 
     // https://stackoverflow.com/questions/15758856/android-how-to-download-file-from-webserver/

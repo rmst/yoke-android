@@ -8,4 +8,7 @@
         <item name="android:navigationBarColor">@android:color/black</item>
         <item name="android:progressTint">@android:color/holo_blue_bright</item>
     </style>
+    <style name="WebviewPrompt" parent="android:Theme.Material.Light.Dialog.Alert">
+        <item name="android:backgroundTint">@android:color/white</item>
+    </style>
 </resources>

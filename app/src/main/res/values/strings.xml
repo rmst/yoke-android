@@ -47,6 +47,9 @@
     <string name="error_sending_security_exception">A Security Manager is preventing Yoke from communicating with your PC.</string>
     <string name="error_service_null">Service null.</string>
     <string name="dismiss_error">OK</string>
+    <!-- Also prompts from the webview -->
+    <string name="alert_from_webview">Report from your gamepad:</string>
+    <string name="dismiss_alert">OK</string>
 
     <!-- Debug messages -->
     <string name="log_adding_address">Adding %1$s…</string>
