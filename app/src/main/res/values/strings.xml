@@ -48,7 +48,7 @@
     <string name="error_service_null">Service null.</string>
     <string name="dismiss_error">OK</string>
     <!-- Also prompts from the webview -->
-    <string name="alert_from_webview">Report from your gamepad:</string>
+    <string name="alert_from_webview">Message from your gamepad:</string>
     <string name="dismiss_alert">OK</string>
 
     <!-- Debug messages -->
