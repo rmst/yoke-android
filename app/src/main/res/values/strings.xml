@@ -14,12 +14,12 @@
     <!-- Overflow menu (only an item for the moment) -->
     <string name="menu_upgrade_layout">Upgrade gamepad</string>
 
-    <!-- Toasts shown on user mistake -->
-    <string name="toast_connected_to_nowhere">Please use the dropdown menu to connect to a machine.</string>
-    <string name="toast_could_not_connect">Failed to connect to %1$s:%2$d.</string>
-    <string name="toast_download_layout_first">You need to download a gamepad. Click the ⋮ menu button, then "%1$s", then ↻ "%2$s".</string>
-    <string name="toast_invalid_address">Invalid address.</string>
-    <!-- or on success: -->
+    <!-- Popups shown on user mistake -->
+    <string name="info_connected_to_nowhere">Please use the dropdown menu to connect to a machine.</string>
+    <string name="info_could_not_connect">Failed to connect to %1$s:%2$d.</string>
+    <string name="info_download_layout_first">You need to download a gamepad. Click the ⋮ menu button, then "%1$s", then ↻ "%2$s".</string>
+    <string name="info_invalid_address">Invalid address.</string>
+    <!-- or a toast on success: -->
     <string name="toast_layout_succesfully_upgraded">Gamepad succesfully upgraded.</string>
 
     <!-- These strings are displayed when the user opens the spinner to select a machine to connect to -->

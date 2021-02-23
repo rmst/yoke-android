@@ -338,7 +338,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                     wv.loadUrl(url);
                 } else {
                     logInfo(String.format(
-                        res.getString(R.string.toast_download_layout_first),
+                        res.getString(R.string.info_download_layout_first),
                         res.getString(R.string.menu_upgrade_layout),
                         res.getString(R.string.toolbar_reconnect)
                     ));
@@ -455,8 +455,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                             mTextView.setText(res.getString(R.string.toolbar_connect_to));
                             mSpinner.setSelection(mAdapter.getPosition(NOTHING));
                             currentHost = null;
-                            Toast.makeText(YokeActivity.this, res.getString(R.string.toast_invalid_address), Toast.LENGTH_LONG).show();
-
+                            logInfo(res.getString(R.string.info_invalid_address));
                         } else {
                             mServiceNames.add(name);
                             mAdapter.add(name);
@@ -602,7 +601,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     public void reconnect(View view) {
         String tgt = mSpinner.getSelectedItem().toString();
         if (currentHost == null) {
-            Toast.makeText(YokeActivity.this, res.getString(R.string.toast_connected_to_nowhere), Toast.LENGTH_LONG).show();
+            logInfo(res.getString(R.string.info_connected_to_nowhere));
         } else {
             log(res.getString(R.string.log_udp_closed));
             mSocket.close();
@@ -625,9 +624,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                                 "http://" + currentHost + ":" + Integer.toString(currentPort) + "/"
                             );
                         } else {
-                            Toast.makeText(YokeActivity.this,
-                                res.getString(R.string.toast_connected_to_nowhere), Toast.LENGTH_LONG
-                            ).show();
+                            logInfo(res.getString(R.string.info_connected_to_nowhere));
                         }
                         return true;
                     default:
