@@ -111,6 +111,20 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         });
     }
 
+    private void logInfo(String m) {
+        Log.i("Yoke", m);
+        YokeActivity.this.runOnUiThread(() -> {
+            AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this);
+            builder.setMessage(m);
+            builder.setNegativeButton(R.string.dismiss_error, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int id) {
+                    dialog.cancel();
+                }
+            });
+            builder.show();
+        });
+    }
+
     private void deleteRecursively(File joypadPath) throws IOException {
         // Deleting a folder without emptying it first fails or raises an error,
         // and there is no one-liner in this version to empty its contents. So:
@@ -164,11 +178,16 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     }
 
     // https://stackoverflow.com/questions/15758856/android-how-to-download-file-from-webserver/
-    class DownloadFilesFromURL extends AsyncTask<String, Long, Void> {
+    class DownloadFilesFromURL extends AsyncTask<String, Long, Long> {
+        // This class can be used in two ways:
+        // with one argument, parses the manifest and downloads the content from the entire webserver.
+        // with two arguments, downloads a specific file. For the moment we use this to download the manifest
+        // as a crude ping and a way to ensure the IP is actually running Yoke. 
 
         private final long INDETERMINATE = -1L;
         private final long DETERMINATE = -2L;
-        private final long OVER = -4L;
+        private final long UPDATE_SUCCESS = -8L;
+        private final long PING_SUCCESS = -16L;
 
         private final int MAX_PROGRESS = 1000;
 
@@ -197,59 +216,69 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         }
 
         @Override
-        protected Void doInBackground(String... f_url) {
+        protected Long doInBackground(String... f_url) {
             StringBuilder manifestSB = new StringBuilder();
+            byte data[] = new byte[1024];
             try {
-                byte data[] = new byte[1024];
-
-                URL url = new URL(f_url[0] + "manifest.json");
-                InputStream input = new BufferedInputStream(url.openStream(), 8192);
-                OutputStream output = new FileOutputStream(futureManifestPath);
-                int count;
-                publishProgress(0L, INDETERMINATE);
-                while ((count = input.read(data)) != -1) {
-                    output.write(data, 0, count);
-                }
-                BufferedReader inputBR = new BufferedReader(
-                    new FileReader(futureManifestPath)
-                );
-                String line = "";
-                while ((line = inputBR.readLine()) != null) {
-                    manifestSB.append(line).append("\n");
-                }
-                JSONObject manifestJSON = new JSONObject(manifestSB.toString());
-
-                long totalBytes = manifestJSON.optLong("size", INDETERMINATE);
-                if (totalBytes != INDETERMINATE)
-                    publishProgress(0L, DETERMINATE);
-                JSONArray entries = manifestJSON.getJSONArray("folders");
-                for (int i = 0, length = entries.length(); i < length; i++) {
-                    File newFolder = new File(futureJoypadPath, entries.getString(i));
-                    log(String.format(res.getString(R.string.log_creating_folder), newFolder.getAbsolutePath()));
-                    if (!newFolder.mkdirs()) {
-                        throw new IOException(String.format(
-                            res.getString(R.string.error_could_not_create_folder), newFolder.getAbsolutePath()
-                        ));
-                    }
-                }
-
-                entries = manifestJSON.getJSONArray("files");
-                long cumulativeBytes = 0;
-                for (int i = 0, length=entries.length(); i < length; i++) {
-                    File newFile = new File(futureJoypadPath, entries.getString(i));
-                    log(String.format(res.getString(R.string.log_downloading_file), newFile.getAbsolutePath()));
-                    input = new BufferedInputStream(new URL(f_url[0] + entries.getString(i)).openStream(), 8192);
-                    output = new FileOutputStream(newFile);
-
+                if (f_url.length == 1) {
+                    // Download the whole server
+                    URL url = new URL(f_url[0] + "manifest.json");
+                    InputStream input = new BufferedInputStream(url.openStream(), 8192);
+                    OutputStream output = new FileOutputStream(futureManifestPath);
+                    int count;
+                    publishProgress(0L, INDETERMINATE);
                     while ((count = input.read(data)) != -1) {
-                        cumulativeBytes += count;
                         output.write(data, 0, count);
-                        publishProgress(cumulativeBytes, totalBytes);
+                    }
+                    BufferedReader inputBR = new BufferedReader(
+                        new FileReader(futureManifestPath)
+                    );
+                    String line = "";
+                    while ((line = inputBR.readLine()) != null) {
+                        manifestSB.append(line).append("\n");
+                    }
+                    JSONObject manifestJSON = new JSONObject(manifestSB.toString());
+
+                    long totalBytes = manifestJSON.optLong("size", INDETERMINATE);
+                    if (totalBytes != INDETERMINATE)
+                        publishProgress(0L, DETERMINATE);
+                    JSONArray entries = manifestJSON.getJSONArray("folders");
+                    for (int i = 0, length = entries.length(); i < length; i++) {
+                        File newFolder = new File(futureJoypadPath, entries.getString(i));
+                        log(String.format(res.getString(R.string.log_creating_folder), newFolder.getAbsolutePath()));
+                        if (!newFolder.mkdirs()) {
+                            throw new IOException(String.format(
+                                res.getString(R.string.error_could_not_create_folder), newFolder.getAbsolutePath()
+                            ));
+                        }
                     }
 
-                    output.flush();
-                    output.close();
-                    input.close();
+                    entries = manifestJSON.getJSONArray("files");
+                    long cumulativeBytes = 0;
+                    for (int i = 0, length=entries.length(); i < length; i++) {
+                        File newFile = new File(futureJoypadPath, entries.getString(i));
+                        log(String.format(res.getString(R.string.log_downloading_file), newFile.getAbsolutePath()));
+                        input = new BufferedInputStream(new URL(f_url[0] + entries.getString(i)).openStream(), 8192);
+                        output = new FileOutputStream(newFile);
+
+                        while ((count = input.read(data)) != -1) {
+                            cumulativeBytes += count;
+                            output.write(data, 0, count);
+                            publishProgress(cumulativeBytes, totalBytes);
+                        }
+
+                        output.flush();
+                        output.close();
+                        input.close();
+                    }
+                    return UPDATE_SUCCESS;
+                } else {
+                    // download just one file
+                    URL url = new URL(f_url[0] + "/" + f_url[1]);
+                    InputStream input = new BufferedInputStream(url.openStream(), 8192);
+                    publishProgress(0L, INDETERMINATE);
+                    while (input.read(data) != -1) { }
+                    return PING_SUCCESS;
                 }
             } catch (IOException e) {
                 if (e.getLocalizedMessage().contains(" ECONNREFUSED ")) {
@@ -257,18 +286,15 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 } else {
                     logError(e.getLocalizedMessage(), e);
                 }
-                publishProgress(0L, OVER);
                 cancel(true);
             } catch (JSONException e) {
                 logError(String.format(res.getString(R.string.error_json_exception), e.getLocalizedMessage()), e);
-                publishProgress(0L, OVER);
                 cancel(true);
             } catch (SecurityException e) {
                 logError(res.getString(R.string.error_security_exception), e);
-                publishProgress(0L, OVER);
                 cancel(true);
             }
-            return null;
+            return 0L;
         }
 
         protected void onProgressUpdate(Long... progress) {
@@ -276,39 +302,54 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 mProgressBar.setIndeterminate(true);
                 mProgressBar.setVisibility(View.VISIBLE);
             } else if (progress[1] == DETERMINATE) {
+                mTextView.setText(res.getString(R.string.toolbar_connected_to));
                 mProgressBar.setIndeterminate(false);
                 mProgressBar.setProgress(0);
                 mProgressBar.setMax((int)MAX_PROGRESS);
                 mProgressBar.setVisibility(View.VISIBLE);
-            } else if (progress[1] == OVER) {
-                mProgressBar.setIndeterminate(false);
-                mProgressBar.setProgress(0);
-                mProgressBar.setVisibility(View.INVISIBLE);
-                Toast.makeText(YokeActivity.this, res.getString(R.string.toast_layout_succesfully_upgraded), Toast.LENGTH_LONG).show();
             } else {
                 mProgressBar.setProgress((int)(progress[0]*MAX_PROGRESS/progress[1]));
             }
         }
 
         @Override
-        protected void onPostExecute(Void v) {
-            try {
-                if (currentJoypadPath.exists()) {
-                    deleteRecursively(currentJoypadPath);
-                }
-                if (!futureJoypadPath.renameTo(currentJoypadPath)) {
-                    logError(String.format(res.getString(R.string.error_could_not_rename), futureJoypadPath.getAbsolutePath()), null);
+        protected void onPostExecute(Long result) {
+            if (result == UPDATE_SUCCESS) {
+                mProgressBar.setVisibility(View.INVISIBLE);
+                try {
+                    if (currentJoypadPath.exists()) {
+                        deleteRecursively(currentJoypadPath);
+                    }
+                    if (!futureJoypadPath.renameTo(currentJoypadPath)) {
+                        logError(String.format(res.getString(R.string.error_could_not_rename), futureJoypadPath.getAbsolutePath()), null);
+                        cancel(true);
+                    }
+                    Toast.makeText(YokeActivity.this, res.getString(R.string.toast_layout_succesfully_upgraded), Toast.LENGTH_LONG).show();
+                } catch (IOException e) {
+                    logError(String.format(res.getString(R.string.error_io_exception), e.getLocalizedMessage()), e);
                     cancel(true);
                 }
-            } catch (IOException e) {
-                logError(String.format(res.getString(R.string.error_io_exception), e.getLocalizedMessage()), e);
-                cancel(true);
+            } else if (result == PING_SUCCESS) {
+                mProgressBar.setVisibility(View.INVISIBLE);
+                mTextView.setText(res.getString(R.string.toolbar_connected_to));
+                if (currentMainPath.exists()) {
+                    String url = "file://" + currentMainPath.toString();
+                    log(String.format(res.getString(R.string.log_loading_url), url));
+                    wv.loadUrl(url);
+                } else {
+                    logInfo(String.format(
+                        res.getString(R.string.toast_download_layout_first),
+                        res.getString(R.string.menu_upgrade_layout),
+                        res.getString(R.string.toolbar_reconnect)
+                    ));
+                }
             }
-            (new Thread(()-> publishProgress(0L, OVER))).start();
         }
 
         @Override
         protected void onCancelled() {
+            mProgressBar.setVisibility(View.INVISIBLE);
+            mTextView.setText(res.getString(R.string.toolbar_connect_to));
         }
     }
 
@@ -608,20 +649,9 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             mSocket.connect(InetAddress.getByName(host), port);
 
             log(res.getString(R.string.log_open_udp_success));
-            String url = "file://" + currentMainPath.toString();
-            YokeActivity.this.runOnUiThread(() -> {
-                mTextView.setText(res.getString(R.string.toolbar_connected_to));
-                if (currentMainPath.exists()) {
-                    wv.loadUrl(url);
-                } else {
-                    Toast.makeText(YokeActivity.this, String.format(
-                        res.getString(R.string.toast_download_layout_first),
-                        res.getString(R.string.menu_upgrade_layout),
-                        res.getString(R.string.toolbar_reconnect)
-                    ), Toast.LENGTH_LONG).show();
-                }
-            });
-            log(String.format(res.getString(R.string.log_loading_url), url));
+            new DownloadFilesFromURL().execute(
+                "http://" + currentHost + ":" + Integer.toString(currentPort) + "/", "manifest.json"
+            );
 
         } catch (SocketException | UnknownHostException e) {
             mSocket = null; currentHost = null;
