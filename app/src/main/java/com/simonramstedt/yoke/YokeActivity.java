@@ -617,18 +617,17 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         popup.inflate(R.menu.overflow);
         popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
             public boolean onMenuItemClick(MenuItem item) {
-                switch (item.getItemId()) {
-                    case R.id.upgradeLayout:
-                        if (currentHost != null) {
-                            new DownloadFilesFromURL().execute(
-                                "http://" + currentHost + ":" + Integer.toString(currentPort) + "/"
-                            );
-                        } else {
-                            logInfo(res.getString(R.string.info_connected_to_nowhere));
-                        }
-                        return true;
-                    default:
-                        return false;
+                if (item.getItemId() == R.id.upgradeLayout) {
+                    if (currentHost != null) {
+                        new DownloadFilesFromURL().execute(
+                            "http://" + currentHost + ":" + Integer.toString(currentPort) + "/"
+                        );
+                    } else {
+                        logInfo(res.getString(R.string.info_connected_to_nowhere));
+                    }
+                    return true;
+                } else {
+                    return false;
                 }
             }
         });
