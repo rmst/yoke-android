@@ -70,6 +70,8 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private SharedPreferences sharedPref;
     private TextView mTextView;
     private Spinner mSpinner;
+    private boolean mSpinnerAutomatic = false;
+    private String oldtgt;
     private ProgressBar mProgressBar;
     private ArrayAdapter<String> mAdapter;
     private Handler handler;
@@ -371,6 +373,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         res = getResources();
         NOTHING = res.getString(R.string.dropdown_nothing);
         ENTER_IP = res.getString(R.string.dropdown_enter_ip);
+        oldtgt = NOTHING;
 
         // Paths for layout (can't define them until Android context is established)
         currentJoypadPath = new File(getFilesDir(), "joypad");
@@ -404,24 +407,28 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         mSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int pos, long l) {
-
                 String tgt = parent.getItemAtPosition(pos).toString();
-                log(String.format(res.getString(R.string.log_spinner_selected), tgt));
 
-                // clean up old target if no longer available
-                String oldtgt = mSpinner.getSelectedItem().toString();
-                if (!mServiceNames.contains(oldtgt) && !oldtgt.equals(NOTHING) && !oldtgt.equals(ENTER_IP)) {
-                    mAdapter.remove(oldtgt);
-                    if (oldtgt.equals(tgt)) {
-                        tgt = NOTHING;
-                    }
+                if (mSpinnerAutomatic) {
+                    mSpinnerAutomatic = false;
+                    log(String.format(res.getString(R.string.log_spinner_automatic), tgt, pos));
+                    return;
                 }
 
-                closeConnection();
+                log(String.format(res.getString(R.string.log_spinner_selected), tgt, pos));
+
+                // clean up old target if no longer available
+                if (!mServiceNames.contains(oldtgt) && !oldtgt.equals(NOTHING) && !oldtgt.equals(ENTER_IP)) {
+                    mAdapter.remove(oldtgt);
+                    if (oldtgt.equals(tgt)) tgt = NOTHING;
+                }
 
                 if (tgt.equals(NOTHING)) {
-
+                    closeConnection();
                 } else if (tgt.equals(ENTER_IP)) {
+                    mSpinnerAutomatic = true;
+                    mSpinner.setSelection(mAdapter.getPosition(oldtgt));
+
                     AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this);
                     builder.setTitle(res.getString(R.string.enter_ip_title));
 
@@ -431,13 +438,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
                     builder.setView(input);
 
-                    builder.setOnCancelListener(new DialogInterface.OnCancelListener() {
-                        public void onCancel(DialogInterface dialog) {
-                            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
-                            mTextView.setText(res.getString(R.string.toolbar_connect_to));
-                            currentHost = null;
-                        }
-                    });
                     builder.setPositiveButton(res.getString(R.string.enter_ip_ok), (dialog, which) -> {
                         String name = input.getText().toString();
 
@@ -452,30 +452,27 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                         }
 
                         if (invalid) {
-                            mTextView.setText(res.getString(R.string.toolbar_connect_to));
-                            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
-                            currentHost = null;
                             logInfo(res.getString(R.string.info_invalid_address));
+                            dialog.cancel();
                         } else {
                             mServiceNames.add(name);
                             mAdapter.add(name);
-                            mSpinner.setSelection(mAdapter.getPosition(name));
 
                             SharedPreferences.Editor editor = sharedPref.edit();
                             String addresses = sharedPref.getString("addresses", "");
                             addresses = addresses + name + System.lineSeparator();
                             editor.putString("addresses", addresses);
                             editor.apply();
+
+                            oldtgt = name;
+                            mSpinnerAutomatic = true;
+                            mSpinner.setSelection(mAdapter.getPosition(name));
+                            connectToAddress(name);
                         }
                     });
                     builder.setNegativeButton(res.getString(R.string.enter_ip_cancel), (dialog, which) -> {
                         dialog.cancel();
                     });
-                    builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                        @Override
-                        public void onDismiss(DialogInterface dialog) {dialog.cancel();}
-                    });
-
                     builder.show();
                 } else {
                     log(String.format(res.getString(R.string.log_service_targeting), tgt));
@@ -486,6 +483,8 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                         connectToAddress(tgt);
                     }
                 }
+                if (!tgt.equals(ENTER_IP))
+                    oldtgt = mSpinner.getSelectedItem().toString();
             }
 
             @Override
@@ -552,8 +551,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         } catch (SecurityException e) {
             logError(res.getString(R.string.error_sending_security_exception), e);
             closeConnection();
-            mTextView.setText(res.getString(R.string.toolbar_connect_to));
-            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
         } catch (IOException e) {
             if (e.getLocalizedMessage().contains(" ECONNREFUSED ")) {
                 logError(res.getString(R.string.error_connection_refused), e);
@@ -561,8 +558,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 logError(e.getLocalizedMessage(), e);
             }
             closeConnection();
-            mTextView.setText(res.getString(R.string.toolbar_connect_to));
-            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
         }
     }
 
@@ -573,9 +568,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             @Override
             public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
                 logError(String.format(res.getString(R.string.log_service_resolve_error), errorCode), null);
-                mTextView.setText(res.getString(R.string.toolbar_connect_to));
-                mSpinner.setSelection(mAdapter.getPosition(NOTHING));
-                currentHost = null;
+                closeConnection();
             }
 
             @Override
@@ -652,6 +645,8 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         } catch (SocketException | UnknownHostException e) {
             mSocket = null; currentHost = null;
             YokeActivity.this.runOnUiThread(() -> {
+                mTextView.setText(res.getString(R.string.toolbar_connect_to));
+                mSpinnerAutomatic = true;
                 mSpinner.setSelection(mAdapter.getPosition(NOTHING));
             });
             logError(String.format(res.getString(R.string.error_open_udp_error), host, port), e);
@@ -709,15 +704,22 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     }
 
     private void closeConnection() {
+        log(res.getString(R.string.log_closing_connection));
+        vals_buffer = null;
         mService = null;
         if (mSocket != null) {
             log(res.getString(R.string.log_udp_closed));
             mSocket.close();
             mSocket = null;
         }
-        currentHost = null;
+        if (currentHost != null)
+            currentHost = null;
         wv.loadUrl("about:blank");
-        vals_buffer = null;
+        mTextView.setText(res.getString(R.string.toolbar_connect_to));
+        if (!mSpinner.getSelectedItem().toString().equals(NOTHING)) {
+            mSpinnerAutomatic = true;
+            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
+        }
     }
 }
 

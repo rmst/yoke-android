@@ -53,6 +53,7 @@
 
     <!-- Debug messages -->
     <string name="log_adding_address">Adding %1$s…</string>
+    <string name="log_closing_connection">Closing connection…</string>
     <string name="log_creating_folder">Creating local folder %1$s</string>
     <string name="log_directly_connecting">Connecting directly to IP address %1$s…</string>
     <string name="log_downloading_file">Downloading file to %1$s</string>
@@ -68,7 +69,8 @@
     <string name="log_service_resolve_success">Service \"%1$s\" succesfully resolved.</string>
     <string name="log_service_resolving">Resolving service \"%1$s\"…</string>
     <string name="log_service_targeting">New service target: \"%1$s\".</string>
-    <string name="log_spinner_selected">"%1$s" selected in the spinner.</string>
+    <string name="log_spinner_automatic">Spinner set automatically to "%1$s" (pos %2$d).</string>
+    <string name="log_spinner_selected">"%1$s" (pos %2$d) selected in the spinner.</string>
     <string name="log_udp_closed">Connection closed.</string>
 </resources>
 
