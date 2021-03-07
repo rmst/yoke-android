@@ -3,13 +3,12 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@android:color/holo_blue_dark">
+    android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="40sp"
-        android:background="@android:color/holo_blue_light"
+        android:layout_marginRight="25dp"
         android:gravity="start"
         android:orientation="horizontal">
 
@@ -25,6 +24,7 @@
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_weight="0"
+            android:backgroundTintMode="multiply"
             android:contentDescription="@string/toolbar_reconnect"
             android:tooltipText="@string/toolbar_reconnect"
             android:onClick="reconnect" />
@@ -52,6 +52,7 @@
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_weight="0"
+            android:backgroundTintMode="multiply"
             android:contentDescription="@string/toolbar_overflow"
             android:tooltipText="@string/toolbar_overflow"
             android:onClick="showOverflowMenu" />
@@ -61,8 +62,9 @@
     <ProgressBar
         android:id="@+id/downloadProgress"
         style="@android:style/Widget.ProgressBar.Horizontal"
+        android:visibility="invisible"
         android:layout_width="match_parent"
-        android:layout_height="8dp" />
+        android:layout_height="5dp" />
 
     <WebView
         android:id="@+id/webView"

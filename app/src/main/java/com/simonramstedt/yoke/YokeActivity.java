@@ -46,6 +46,7 @@ import java.net.SocketException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -63,12 +64,14 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private NsdManager mNsdManager;
     private NsdServiceInfo mService;
     private DatagramSocket mSocket;
-    private String vals_str = null;
+    private byte[] vals_buffer = null;
     private Map<String, NsdServiceInfo> mServiceMap = new HashMap<>();
     private List<String> mServiceNames = new ArrayList<>();
     private SharedPreferences sharedPref;
     private TextView mTextView;
     private Spinner mSpinner;
+    private boolean mSpinnerAutomatic = false;
+    private String oldtgt;
     private ProgressBar mProgressBar;
     private ArrayAdapter<String> mAdapter;
     private Handler handler;
@@ -98,6 +101,20 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             }
             Log.e("Yoke", sb.toString());
         }
+        YokeActivity.this.runOnUiThread(() -> {
+            AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this);
+            builder.setMessage(m);
+            builder.setNegativeButton(R.string.dismiss_error, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int id) {
+                    dialog.cancel();
+                }
+            });
+            builder.show();
+        });
+    }
+
+    private void logInfo(String m) {
+        Log.i("Yoke", m);
         YokeActivity.this.runOnUiThread(() -> {
             AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this);
             builder.setMessage(m);
@@ -142,19 +159,37 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         }
 
         // Webpage uses this method to update joypad state:
+        // TODO: Investigate a WebMessagePort-based solution which works for Lollipop and older
         @JavascriptInterface
         public void update_vals(String vals) {
-            vals_str = vals;
+            vals_buffer = vals.getBytes(Charset.forName("ISO-8859-1"));
             update();
+        }
+        @JavascriptInterface
+        public void alert(String m) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this, R.style.WebviewPrompt);
+            builder.setTitle(R.string.alert_from_webview);
+            builder.setMessage(m);
+            builder.setNegativeButton(R.string.dismiss_alert, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int id) {
+                    dialog.cancel();
+                }
+            });
+            builder.show();
         }
     }
 
     // https://stackoverflow.com/questions/15758856/android-how-to-download-file-from-webserver/
-    class DownloadFilesFromURL extends AsyncTask<String, Long, Void> {
+    class DownloadFilesFromURL extends AsyncTask<String, Long, Long> {
+        // This class can be used in two ways:
+        // with one argument, parses the manifest and downloads the content from the entire webserver.
+        // with two arguments, downloads a specific file. For the moment we use this to download the manifest
+        // as a crude ping and a way to ensure the IP is actually running Yoke. 
 
         private final long INDETERMINATE = -1L;
         private final long DETERMINATE = -2L;
-        private final long SUCCESS = -4L;
+        private final long UPDATE_SUCCESS = -8L;
+        private final long PING_SUCCESS = -16L;
 
         private final int MAX_PROGRESS = 1000;
 
@@ -183,59 +218,69 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         }
 
         @Override
-        protected Void doInBackground(String... f_url) {
+        protected Long doInBackground(String... f_url) {
             StringBuilder manifestSB = new StringBuilder();
+            byte data[] = new byte[1024];
             try {
-                byte data[] = new byte[1024];
-
-                URL url = new URL(f_url[0] + "manifest.json");
-                InputStream input = new BufferedInputStream(url.openStream(), 8192);
-                OutputStream output = new FileOutputStream(futureManifestPath);
-                int count;
-                publishProgress(0L, INDETERMINATE);
-                while ((count = input.read(data)) != -1) {
-                    output.write(data, 0, count);
-                }
-                BufferedReader inputBR = new BufferedReader(
-                    new FileReader(futureManifestPath)
-                );
-                String line = "";
-                while ((line = inputBR.readLine()) != null) {
-                    manifestSB.append(line).append("\n");
-                }
-                JSONObject manifestJSON = new JSONObject(manifestSB.toString());
-
-                long totalBytes = manifestJSON.optLong("size", INDETERMINATE);
-                if (totalBytes != INDETERMINATE)
-                    publishProgress(0L, DETERMINATE);
-                JSONArray entries = manifestJSON.getJSONArray("folders");
-                for (int i = 0, length = entries.length(); i < length; i++) {
-                    File newFolder = new File(futureJoypadPath, entries.getString(i));
-                    log(String.format(res.getString(R.string.log_creating_folder), newFolder.getAbsolutePath()));
-                    if (!newFolder.mkdirs()) {
-                        throw new IOException(String.format(
-                            res.getString(R.string.error_could_not_create_folder), newFolder.getAbsolutePath()
-                        ));
-                    }
-                }
-
-                entries = manifestJSON.getJSONArray("files");
-                long cumulativeBytes = 0;
-                for (int i = 0, length=entries.length(); i < length; i++) {
-                    File newFile = new File(futureJoypadPath, entries.getString(i));
-                    log(String.format(res.getString(R.string.log_downloading_file), newFile.getAbsolutePath()));
-                    input = new BufferedInputStream(new URL(f_url[0] + entries.getString(i)).openStream(), 8192);
-                    output = new FileOutputStream(newFile);
-
+                if (f_url.length == 1) {
+                    // Download the whole server
+                    URL url = new URL(f_url[0] + "manifest.json");
+                    InputStream input = new BufferedInputStream(url.openStream(), 8192);
+                    OutputStream output = new FileOutputStream(futureManifestPath);
+                    int count;
+                    publishProgress(0L, INDETERMINATE);
                     while ((count = input.read(data)) != -1) {
-                        cumulativeBytes += count;
                         output.write(data, 0, count);
-                        publishProgress(cumulativeBytes, totalBytes);
+                    }
+                    BufferedReader inputBR = new BufferedReader(
+                        new FileReader(futureManifestPath)
+                    );
+                    String line = "";
+                    while ((line = inputBR.readLine()) != null) {
+                        manifestSB.append(line).append("\n");
+                    }
+                    JSONObject manifestJSON = new JSONObject(manifestSB.toString());
+
+                    long totalBytes = manifestJSON.optLong("size", INDETERMINATE);
+                    if (totalBytes != INDETERMINATE)
+                        publishProgress(0L, DETERMINATE);
+                    JSONArray entries = manifestJSON.getJSONArray("folders");
+                    for (int i = 0, length = entries.length(); i < length; i++) {
+                        File newFolder = new File(futureJoypadPath, entries.getString(i));
+                        log(String.format(res.getString(R.string.log_creating_folder), newFolder.getAbsolutePath()));
+                        if (!newFolder.mkdirs()) {
+                            throw new IOException(String.format(
+                                res.getString(R.string.error_could_not_create_folder), newFolder.getAbsolutePath()
+                            ));
+                        }
                     }
 
-                    output.flush();
-                    output.close();
-                    input.close();
+                    entries = manifestJSON.getJSONArray("files");
+                    long cumulativeBytes = 0;
+                    for (int i = 0, length=entries.length(); i < length; i++) {
+                        File newFile = new File(futureJoypadPath, entries.getString(i));
+                        log(String.format(res.getString(R.string.log_downloading_file), newFile.getAbsolutePath()));
+                        input = new BufferedInputStream(new URL(f_url[0] + entries.getString(i)).openStream(), 8192);
+                        output = new FileOutputStream(newFile);
+
+                        while ((count = input.read(data)) != -1) {
+                            cumulativeBytes += count;
+                            output.write(data, 0, count);
+                            publishProgress(cumulativeBytes, totalBytes);
+                        }
+
+                        output.flush();
+                        output.close();
+                        input.close();
+                    }
+                    return UPDATE_SUCCESS;
+                } else {
+                    // download just one file
+                    URL url = new URL(f_url[0] + "/" + f_url[1]);
+                    InputStream input = new BufferedInputStream(url.openStream(), 8192);
+                    publishProgress(0L, INDETERMINATE);
+                    while (input.read(data) != -1) { }
+                    return PING_SUCCESS;
                 }
             } catch (IOException e) {
                 if (e.getLocalizedMessage().contains(" ECONNREFUSED ")) {
@@ -251,44 +296,62 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 logError(res.getString(R.string.error_security_exception), e);
                 cancel(true);
             }
-            return null;
+            return 0L;
         }
 
         protected void onProgressUpdate(Long... progress) {
             if (progress[1] == INDETERMINATE) {
                 mProgressBar.setIndeterminate(true);
+                mProgressBar.setVisibility(View.VISIBLE);
             } else if (progress[1] == DETERMINATE) {
+                mTextView.setText(res.getString(R.string.toolbar_connected_to));
                 mProgressBar.setIndeterminate(false);
                 mProgressBar.setProgress(0);
                 mProgressBar.setMax((int)MAX_PROGRESS);
-            } else if (progress[1] == SUCCESS) {
-                mProgressBar.setIndeterminate(false);
-                mProgressBar.setProgress(0);
-                Toast.makeText(YokeActivity.this, res.getString(R.string.toast_layout_succesfully_upgraded), Toast.LENGTH_LONG).show();
+                mProgressBar.setVisibility(View.VISIBLE);
             } else {
                 mProgressBar.setProgress((int)(progress[0]*MAX_PROGRESS/progress[1]));
             }
         }
 
         @Override
-        protected void onPostExecute(Void v) {
-            try {
-                if (currentJoypadPath.exists()) {
-                    deleteRecursively(currentJoypadPath);
-                }
-                if (!futureJoypadPath.renameTo(currentJoypadPath)) {
-                    logError(String.format(res.getString(R.string.error_could_not_rename), futureJoypadPath.getAbsolutePath()), null);
+        protected void onPostExecute(Long result) {
+            if (result == UPDATE_SUCCESS) {
+                mProgressBar.setVisibility(View.INVISIBLE);
+                try {
+                    if (currentJoypadPath.exists()) {
+                        deleteRecursively(currentJoypadPath);
+                    }
+                    if (!futureJoypadPath.renameTo(currentJoypadPath)) {
+                        logError(String.format(res.getString(R.string.error_could_not_rename), futureJoypadPath.getAbsolutePath()), null);
+                        cancel(true);
+                    }
+                    Toast.makeText(YokeActivity.this, res.getString(R.string.toast_layout_succesfully_upgraded), Toast.LENGTH_LONG).show();
+                } catch (IOException e) {
+                    logError(String.format(res.getString(R.string.error_io_exception), e.getLocalizedMessage()), e);
                     cancel(true);
                 }
-            } catch (IOException e) {
-                logError(String.format(res.getString(R.string.error_io_exception), e.getLocalizedMessage()), e);
-                cancel(true);
+            } else if (result == PING_SUCCESS) {
+                mProgressBar.setVisibility(View.INVISIBLE);
+                mTextView.setText(res.getString(R.string.toolbar_connected_to));
+                if (currentMainPath.exists()) {
+                    String url = "file://" + currentMainPath.toString();
+                    log(String.format(res.getString(R.string.log_loading_url), url));
+                    wv.loadUrl(url);
+                } else {
+                    logInfo(String.format(
+                        res.getString(R.string.info_download_layout_first),
+                        res.getString(R.string.menu_upgrade_layout),
+                        res.getString(R.string.toolbar_reconnect)
+                    ));
+                }
             }
-            (new Thread(()-> publishProgress(0L, SUCCESS))).start();
         }
 
         @Override
         protected void onCancelled() {
+            mProgressBar.setVisibility(View.INVISIBLE);
+            mTextView.setText(res.getString(R.string.toolbar_connect_to));
         }
     }
 
@@ -310,6 +373,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         res = getResources();
         NOTHING = res.getString(R.string.dropdown_nothing);
         ENTER_IP = res.getString(R.string.dropdown_enter_ip);
+        oldtgt = NOTHING;
 
         // Paths for layout (can't define them until Android context is established)
         currentJoypadPath = new File(getFilesDir(), "joypad");
@@ -343,24 +407,28 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         mSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int pos, long l) {
-
                 String tgt = parent.getItemAtPosition(pos).toString();
-                log(String.format(res.getString(R.string.log_spinner_selected), tgt));
 
-                // clean up old target if no longer available
-                String oldtgt = mSpinner.getSelectedItem().toString();
-                if (!mServiceNames.contains(oldtgt) && !oldtgt.equals(NOTHING) && !oldtgt.equals(ENTER_IP)) {
-                    mAdapter.remove(oldtgt);
-                    if (oldtgt.equals(tgt)) {
-                        tgt = NOTHING;
-                    }
+                if (mSpinnerAutomatic) {
+                    mSpinnerAutomatic = false;
+                    log(String.format(res.getString(R.string.log_spinner_automatic), tgt, pos));
+                    return;
                 }
 
-                closeConnection();
+                log(String.format(res.getString(R.string.log_spinner_selected), tgt, pos));
+
+                // clean up old target if no longer available
+                if (!mServiceNames.contains(oldtgt) && !oldtgt.equals(NOTHING) && !oldtgt.equals(ENTER_IP)) {
+                    mAdapter.remove(oldtgt);
+                    if (oldtgt.equals(tgt)) tgt = NOTHING;
+                }
 
                 if (tgt.equals(NOTHING)) {
-
+                    closeConnection();
                 } else if (tgt.equals(ENTER_IP)) {
+                    mSpinnerAutomatic = true;
+                    mSpinner.setSelection(mAdapter.getPosition(oldtgt));
+
                     AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this);
                     builder.setTitle(res.getString(R.string.enter_ip_title));
 
@@ -370,13 +438,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
                     builder.setView(input);
 
-                    builder.setOnCancelListener(new DialogInterface.OnCancelListener() {
-                        public void onCancel(DialogInterface dialog) {
-                            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
-                            mTextView.setText(res.getString(R.string.toolbar_connect_to));
-                            currentHost = null;
-                        }
-                    });
                     builder.setPositiveButton(res.getString(R.string.enter_ip_ok), (dialog, which) -> {
                         String name = input.getText().toString();
 
@@ -391,31 +452,27 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                         }
 
                         if (invalid) {
-                            mTextView.setText(res.getString(R.string.toolbar_connect_to));
-                            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
-                            currentHost = null;
-                            Toast.makeText(YokeActivity.this, res.getString(R.string.toast_invalid_address), Toast.LENGTH_LONG).show();
-
+                            logInfo(res.getString(R.string.info_invalid_address));
+                            dialog.cancel();
                         } else {
                             mServiceNames.add(name);
                             mAdapter.add(name);
-                            mSpinner.setSelection(mAdapter.getPosition(name));
 
                             SharedPreferences.Editor editor = sharedPref.edit();
                             String addresses = sharedPref.getString("addresses", "");
                             addresses = addresses + name + System.lineSeparator();
                             editor.putString("addresses", addresses);
                             editor.apply();
+
+                            oldtgt = name;
+                            mSpinnerAutomatic = true;
+                            mSpinner.setSelection(mAdapter.getPosition(name));
+                            connectToAddress(name);
                         }
                     });
                     builder.setNegativeButton(res.getString(R.string.enter_ip_cancel), (dialog, which) -> {
                         dialog.cancel();
                     });
-                    builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                        @Override
-                        public void onDismiss(DialogInterface dialog) {dialog.cancel();}
-                    });
-
                     builder.show();
                 } else {
                     log(String.format(res.getString(R.string.log_service_targeting), tgt));
@@ -426,6 +483,8 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                         connectToAddress(tgt);
                     }
                 }
+                if (!tgt.equals(ENTER_IP))
+                    oldtgt = mSpinner.getSelectedItem().toString();
             }
 
             @Override
@@ -481,8 +540,8 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     }
 
     private void update() {
-        if (mSocket != null && vals_str != null) {
-            send(vals_str.getBytes());
+        if (mSocket != null && vals_buffer != null) {
+            send(vals_buffer);
         }
     }
 
@@ -492,8 +551,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         } catch (SecurityException e) {
             logError(res.getString(R.string.error_sending_security_exception), e);
             closeConnection();
-            mTextView.setText(res.getString(R.string.toolbar_connect_to));
-            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
         } catch (IOException e) {
             if (e.getLocalizedMessage().contains(" ECONNREFUSED ")) {
                 logError(res.getString(R.string.error_connection_refused), e);
@@ -501,8 +558,6 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 logError(e.getLocalizedMessage(), e);
             }
             closeConnection();
-            mTextView.setText(res.getString(R.string.toolbar_connect_to));
-            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
         }
     }
 
@@ -513,9 +568,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             @Override
             public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
                 logError(String.format(res.getString(R.string.log_service_resolve_error), errorCode), null);
-                mTextView.setText(res.getString(R.string.toolbar_connect_to));
-                mSpinner.setSelection(mAdapter.getPosition(NOTHING));
-                currentHost = null;
+                closeConnection();
             }
 
             @Override
@@ -541,13 +594,13 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     public void reconnect(View view) {
         String tgt = mSpinner.getSelectedItem().toString();
         if (currentHost == null) {
-            Toast.makeText(YokeActivity.this, res.getString(R.string.toast_connected_to_nowhere), Toast.LENGTH_LONG).show();
+            logInfo(res.getString(R.string.info_connected_to_nowhere));
         } else {
             log(res.getString(R.string.log_udp_closed));
             mSocket.close();
             mSocket = null;
             wv.loadUrl("about:blank");
-            vals_str = null;
+            vals_buffer = null;
             (new Thread(()-> openSocket(currentHost, currentPort))).start();
         }
     }
@@ -557,20 +610,17 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         popup.inflate(R.menu.overflow);
         popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
             public boolean onMenuItemClick(MenuItem item) {
-                switch (item.getItemId()) {
-                    case R.id.upgradeLayout:
-                        if (currentHost != null) {
-                            new DownloadFilesFromURL().execute(
-                                "http://" + currentHost + ":" + Integer.toString(currentPort) + "/"
-                            );
-                        } else {
-                            Toast.makeText(YokeActivity.this,
-                                res.getString(R.string.toast_connected_to_nowhere), Toast.LENGTH_LONG
-                            ).show();
-                        }
-                        return true;
-                    default:
-                        return false;
+                if (item.getItemId() == R.id.upgradeLayout) {
+                    if (currentHost != null) {
+                        new DownloadFilesFromURL().execute(
+                            "http://" + currentHost + ":" + Integer.toString(currentPort) + "/"
+                        );
+                    } else {
+                        logInfo(res.getString(R.string.info_connected_to_nowhere));
+                    }
+                    return true;
+                } else {
+                    return false;
                 }
             }
         });
@@ -588,24 +638,15 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             mSocket.connect(InetAddress.getByName(host), port);
 
             log(res.getString(R.string.log_open_udp_success));
-            String url = "file://" + currentMainPath.toString();
-            YokeActivity.this.runOnUiThread(() -> {
-                mTextView.setText(res.getString(R.string.toolbar_connected_to));
-                if (currentMainPath.exists()) {
-                    wv.loadUrl(url);
-                } else {
-                    Toast.makeText(YokeActivity.this, String.format(
-                        res.getString(R.string.toast_download_layout_first),
-                        res.getString(R.string.menu_upgrade_layout),
-                        res.getString(R.string.toolbar_reconnect)
-                    ), Toast.LENGTH_LONG).show();
-                }
-            });
-            log(String.format(res.getString(R.string.log_loading_url), url));
+            new DownloadFilesFromURL().execute(
+                "http://" + currentHost + ":" + Integer.toString(currentPort) + "/", "manifest.json"
+            );
 
         } catch (SocketException | UnknownHostException e) {
             mSocket = null; currentHost = null;
             YokeActivity.this.runOnUiThread(() -> {
+                mTextView.setText(res.getString(R.string.toolbar_connect_to));
+                mSpinnerAutomatic = true;
                 mSpinner.setSelection(mAdapter.getPosition(NOTHING));
             });
             logError(String.format(res.getString(R.string.error_open_udp_error), host, port), e);
@@ -663,15 +704,22 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     }
 
     private void closeConnection() {
+        log(res.getString(R.string.log_closing_connection));
+        vals_buffer = null;
         mService = null;
         if (mSocket != null) {
             log(res.getString(R.string.log_udp_closed));
             mSocket.close();
             mSocket = null;
         }
-        currentHost = null;
+        if (currentHost != null)
+            currentHost = null;
         wv.loadUrl("about:blank");
-        vals_str = null;
+        mTextView.setText(res.getString(R.string.toolbar_connect_to));
+        if (!mSpinner.getSelectedItem().toString().equals(NOTHING)) {
+            mSpinnerAutomatic = true;
+            mSpinner.setSelection(mAdapter.getPosition(NOTHING));
+        }
     }
 }
 

@@ -14,12 +14,12 @@
     <!-- Overflow menu (only an item for the moment) -->
     <string name="menu_upgrade_layout">Icrementar gamepad</string>
 
-    <!-- Toasts shown on user mistake -->
-    <string name="toast_connected_to_nowhere">Por favor usar menu de listagem para conectar a máquina.</string>
-    <string name="toast_could_not_connect">Falha ao conectar para %1$s:%2$d.</string>
-    <string name="toast_download_layout_first">Voce precisa baixar um gamepad. Aperte o ícone ⋮ então "%1$s", depois ↻ "%2$s".</string>
-    <string name="toast_invalid_address">Endereço inválido.</string>
-    <!-- or on success: -->
+    <!-- Popups shown on user mistake -->
+    <string name="info_connected_to_nowhere">Por favor usar menu de listagem para conectar a máquina.</string>
+    <string name="info_could_not_connect">Falha ao conectar para %1$s:%2$d.</string>
+    <string name="info_download_layout_first">Voce precisa baixar um gamepad. Aperte o ícone ⋮ então "%1$s", depois ↻ "%2$s".</string>
+    <string name="info_invalid_address">Endereço inválido.</string>
+    <!-- or a toast on success: -->
     <string name="toast_layout_succesfully_upgraded">Gamepad incrementado com sucesso.</string>
 
     <!-- These strings are displayed when the user opens the spinner to select a machine to connect to -->
@@ -47,9 +47,13 @@
     <string name="error_sending_security_exception">Um Gerenciador De Segurança impede o Yoke de se comunicar com seu PC.</string>
     <string name="error_service_null">Serviço nulo.</string>
     <string name="dismiss_error">OK</string>
+    <!-- Also prompts from the webview -->
+    <string name="alert_from_webview">Mensagem do seu gamepad:</string>
+    <string name="dismiss_alert">OK</string>
 
     <!-- Debug messages -->
     <string name="log_adding_address">Adicionando %1$s…</string>
+    <string name="log_closing_connection">Fechando conexão…</string>
     <string name="log_creating_folder">Criando diretório local %1$s</string>
     <string name="log_directly_connecting">Conectando diretamente para o endereço de IP %1$s…</string>
     <string name="log_downloading_file">Baixando arquivo para %1$s</string>
@@ -65,7 +69,8 @@
     <string name="log_service_resolve_success">Serviço \"%1$s\" resolvido com sucesso.</string>
     <string name="log_service_resolving">Resolvendo serviço \"%1$s\"…</string>
     <string name="log_service_targeting">Novo serviço alvo: \"%1$s\".</string>
-    <string name="log_spinner_selected">"%1$s" selecionado no girador.</string>
+    <string name="log_spinner_automatic">Girador alterado automaticamente para "%1$s" (pos %2$d).</string>
+    <string name="log_spinner_selected">"%1$s" (pos %2$d) selecionado no girador.</string>
     <string name="log_udp_closed">Conexão fechada.</string>
 </resources>
 
