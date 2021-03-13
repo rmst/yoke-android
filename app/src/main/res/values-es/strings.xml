@@ -74,5 +74,6 @@
     <string name="log_spinner_automatic">Spinner cambiado automáticamente a "%1$s" (pos %2$d).</string>
     <string name="log_spinner_selected">«%1$s» (pos %2$d) seleccionado en el spinner.</string>
     <string name="log_udp_closed">Conexión cerrada.</string>
+    <string name="log_warning_shot">Enviada la señal de desconexión.</string>
 </resources>
 

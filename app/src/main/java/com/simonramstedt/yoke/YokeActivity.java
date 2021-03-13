@@ -47,6 +47,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -65,12 +66,13 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private NsdServiceInfo mService;
     private DatagramSocket mSocket;
     private byte[] vals_buffer = null;
+    private final int poll_rate = 20;
     private Map<String, NsdServiceInfo> mServiceMap = new HashMap<>();
     private List<String> mServiceNames = new ArrayList<>();
     private SharedPreferences sharedPref;
     private TextView mTextView;
     private Spinner mSpinner;
-    private boolean mSpinnerAutomatic = false;
+    private volatile boolean mSpinnerAutomatic = false;
     private String oldtgt;
     private ProgressBar mProgressBar;
     private ArrayAdapter<String> mAdapter;
@@ -163,7 +165,9 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         @JavascriptInterface
         public void update_vals(String vals) {
             vals_buffer = vals.getBytes(Charset.forName("ISO-8859-1"));
-            update();
+            // Don't force an update. Polling rate must be consistent in app and PC client,
+            // or else messages will be lost anyways:
+            // update();
         }
         @JavascriptInterface
         public void alert(String m) {
@@ -428,7 +432,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 }
 
                 if (tgt.equals(NOTHING)) {
-                    closeConnection();
+                    closeConnection(true);
                 } else if (tgt.equals(ENTER_IP)) {
                     mSpinnerAutomatic = true;
                     mSpinner.setSelection(mAdapter.getPosition(oldtgt));
@@ -437,7 +441,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                     builder.setTitle(res.getString(R.string.enter_ip_title));
 
                     final EditText input = new EditText(YokeActivity.this);
-                    input.setInputType(InputType.TYPE_CLASS_TEXT);
+                    input.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
                     input.setHint(res.getString(R.string.enter_ip_hint));
 
                     builder.setView(input);
@@ -512,7 +516,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 update();
 
                 if (handler != null)
-                    handler.postDelayed(this, 20);
+                    handler.postDelayed(this, poll_rate);
             }
         });
 
@@ -524,7 +528,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
         mNsdManager.stopServiceDiscovery(this);
 
-        closeConnection();
+        closeConnection(false);
 
         handler = null;
     }
@@ -554,7 +558,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             mSocket.send(new DatagramPacket(msg, msg.length));
         } catch (SecurityException e) {
             logError(res.getString(R.string.error_sending_security_exception), e);
-            closeConnection();
+            closeConnection(false);
         } catch (IOException e) {
             if (e.getMessage().contains(" ECONNREFUSED ")) {
                 logError(res.getString(R.string.error_pc_client_closed), e);
@@ -563,7 +567,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             } else {
                 logError(e.getMessage(), e);
             }
-            closeConnection();
+            closeConnection(false);
         }
     }
 
@@ -574,7 +578,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             @Override
             public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
                 logError(String.format(res.getString(R.string.log_service_resolve_error), errorCode), null);
-                closeConnection();
+                closeConnection(false);
             }
 
             @Override
@@ -602,12 +606,11 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         if (currentHost == null) {
             logInfo(res.getString(R.string.info_connected_to_nowhere));
         } else {
-            log(res.getString(R.string.log_udp_closed));
-            mSocket.close();
-            mSocket = null;
-            wv.loadUrl("about:blank");
-            vals_buffer = null;
-            (new Thread(()-> openSocket(currentHost, currentPort))).start();
+            closeConnection(true);
+            mSpinnerAutomatic = true;
+            mSpinner.setSelection(mAdapter.getPosition(tgt));
+            connectToAddress(tgt);
+            mSpinnerAutomatic = false;
         }
     }
 
@@ -709,22 +712,42 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         mNsdManager.stopServiceDiscovery(this);
     }
 
-    private void closeConnection() {
+    // closeConnection(true) sends a copy of the current status with its first byte changed to 0xFF
+    // before closing the connection. This signals the PC client to disconnect the device.
+    // (Enforcing the same length on the message as the previous one seems to be required on Windows.)
+    //
+    // closeConnection(false) closes the connection with no warning: it's intended for both
+    // accidental disconecttions (like exiting the app) and error states (where it doesn't make
+    // sense to warn the client and doing so would probably send to a null socket or cause more errors.)
+    private void closeConnection(boolean warn) {
         log(res.getString(R.string.log_closing_connection));
+        // Don't update the last status report:
+        wv.loadUrl("about:blank");
+        if (mSocket != null && warn) {
+            byte[] impending_disconnect = new byte[vals_buffer.length];
+            // Disable auto-update to avoid race conditions:
+            vals_buffer = null;
+            // Change all bytes to the disconnection signal, and send three times:
+            Arrays.fill(impending_disconnect, (byte) 0xFF);
+            send(impending_disconnect);
+            send(impending_disconnect);
+            send(impending_disconnect);
+            log(res.getString(R.string.log_warning_shot));
+        }
         vals_buffer = null;
         mService = null;
-        if (mSocket != null) {
-            log(res.getString(R.string.log_udp_closed));
-            mSocket.close();
-            mSocket = null;
-        }
         if (currentHost != null)
             currentHost = null;
-        wv.loadUrl("about:blank");
         mTextView.setText(res.getString(R.string.toolbar_connect_to));
         if (!mSpinner.getSelectedItem().toString().equals(NOTHING)) {
             mSpinnerAutomatic = true;
             mSpinner.setSelection(mAdapter.getPosition(NOTHING));
+        }
+        // Delayed to the very end, to sidestep occasional errors:
+        if (mSocket != null) {
+            mSocket.close();
+            mSocket = null;
+            log(res.getString(R.string.log_udp_closed));
         }
     }
 }
