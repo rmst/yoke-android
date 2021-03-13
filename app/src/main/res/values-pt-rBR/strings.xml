@@ -16,7 +16,6 @@
 
     <!-- Popups shown on user mistake -->
     <string name="info_connected_to_nowhere">Por favor usar menu de listagem para conectar a máquina.</string>
-    <string name="info_could_not_connect">Falha ao conectar para %1$s:%2$d.</string>
     <string name="info_download_layout_first">Voce precisa baixar um gamepad. Aperte o ícone ⋮ então "%1$s", depois ↻ "%2$s".</string>
     <string name="info_invalid_address">Endereço inválido.</string>
     <!-- or a toast on success: -->

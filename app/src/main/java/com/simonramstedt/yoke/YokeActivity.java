@@ -212,7 +212,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 logError(res.getString(R.string.error_security_exception), e);
                 cancel(true);
             } catch (IOException e) {
-                logError(e.getLocalizedMessage(), e);
+                logError(e.getMessage(), e);
                 cancel(true);
             }
         }
@@ -283,10 +283,14 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                     return PING_SUCCESS;
                 }
             } catch (IOException e) {
-                if (e.getLocalizedMessage().contains(" ECONNREFUSED ")) {
+                if (e.getMessage().contains(" ECONNREFUSED ")) {
                     logError(res.getString(R.string.error_connection_refused), e);
+                } else if (e.getMessage().contains(" ENETUNREACH ")) {
+                    logError(res.getString(R.string.error_network_unreachable), e);
+                } else if (e.getMessage().startsWith("Failed to connect to")) {
+                    logError(res.getString(R.string.error_failed_download), e);
                 } else {
-                    logError(e.getLocalizedMessage(), e);
+                    logError(e.getMessage(), e);
                 }
                 cancel(true);
             } catch (JSONException e) {
@@ -552,10 +556,12 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             logError(res.getString(R.string.error_sending_security_exception), e);
             closeConnection();
         } catch (IOException e) {
-            if (e.getLocalizedMessage().contains(" ECONNREFUSED ")) {
-                logError(res.getString(R.string.error_connection_refused), e);
+            if (e.getMessage().contains(" ECONNREFUSED ")) {
+                logError(res.getString(R.string.error_pc_client_closed), e);
+            } else if (e.getMessage().contains(" ENETUNREACH ")) {
+                logError(res.getString(R.string.error_network_unreachable), e);
             } else {
-                logError(e.getLocalizedMessage(), e);
+                logError(e.getMessage(), e);
             }
             closeConnection();
         }
