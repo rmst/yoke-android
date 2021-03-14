@@ -723,7 +723,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         log(res.getString(R.string.log_closing_connection));
         // Don't update the last status report:
         wv.loadUrl("about:blank");
-        if (mSocket != null && warn) {
+        if (mSocket != null && vals_buffer != null && warn) {
             byte[] impending_disconnect = new byte[vals_buffer.length];
             // Disable auto-update to avoid race conditions:
             vals_buffer = null;
