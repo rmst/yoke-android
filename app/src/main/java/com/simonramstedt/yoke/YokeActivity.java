@@ -432,7 +432,8 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 }
 
                 if (tgt.equals(NOTHING)) {
-                    closeConnection(true);
+                    requestDisconnect();
+                    closeSocket();
                 } else if (tgt.equals(ENTER_IP)) {
                     mSpinnerAutomatic = true;
                     mSpinner.setSelection(mAdapter.getPosition(oldtgt));
@@ -528,7 +529,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
         mNsdManager.stopServiceDiscovery(this);
 
-        closeConnection(false);
+        closeSocket();
 
         handler = null;
     }
@@ -558,7 +559,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             mSocket.send(new DatagramPacket(msg, msg.length));
         } catch (SecurityException e) {
             logError(res.getString(R.string.error_sending_security_exception), e);
-            closeConnection(false);
+            closeSocket();
         } catch (IOException e) {
             if (e.getMessage().contains(" ECONNREFUSED ")) {
                 logError(res.getString(R.string.error_pc_client_closed), e);
@@ -567,7 +568,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             } else {
                 logError(e.getMessage(), e);
             }
-            closeConnection(false);
+            closeSocket();
         }
     }
 
@@ -578,7 +579,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             @Override
             public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
                 logError(String.format(res.getString(R.string.log_service_resolve_error), errorCode), null);
-                closeConnection(false);
+                closeSocket();
             }
 
             @Override
@@ -606,7 +607,8 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         if (currentHost == null) {
             logInfo(res.getString(R.string.info_connected_to_nowhere));
         } else {
-            closeConnection(true);
+            requestDisconnect();
+            closeSocket();
             mSpinnerAutomatic = true;
             mSpinner.setSelection(mAdapter.getPosition(tgt));
             connectToAddress(tgt);
@@ -712,18 +714,14 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         mNsdManager.stopServiceDiscovery(this);
     }
 
-    // closeConnection(true) sends a copy of the current status with its first byte changed to 0xFF
+    // requestDisconnect() sends a copy of the current status with its first byte changed to 0xFF
     // before closing the connection. This signals the PC client to disconnect the device.
     // (Enforcing the same length on the message as the previous one seems to be required on Windows.)
     //
-    // closeConnection(false) closes the connection with no warning: it's intended for both
-    // accidental disconecttions (like exiting the app) and error states (where it doesn't make
-    // sense to warn the client and doing so would probably send to a null socket or cause more errors.)
-    private void closeConnection(boolean warn) {
-        log(res.getString(R.string.log_closing_connection));
-        // Don't update the last status report:
-        wv.loadUrl("about:blank");
-        if (mSocket != null && vals_buffer != null && warn) {
+    // This warning is not to be sent on accidental disconnections (like exiting the app) or error
+    // states (that usually happen when the client is no longer listening).
+    private void requestDisconnect() {
+        if (mSocket != null && vals_buffer != null) {
             byte[] impending_disconnect = new byte[vals_buffer.length];
             // Disable auto-update to avoid race conditions:
             vals_buffer = null;
@@ -734,6 +732,14 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             send(impending_disconnect);
             log(res.getString(R.string.log_warning_shot));
         }
+    }
+
+    // closeSocket() closes the connection as soon as possible. It disables the periodic
+    // status transmissions, then closes the socket, then updates the UI to reflect this.
+    private void closeSocket() {
+        log(res.getString(R.string.log_closing_connection));
+        // Don't update the last status report:
+        wv.loadUrl("about:blank");
         vals_buffer = null;
         mService = null;
         if (currentHost != null)
