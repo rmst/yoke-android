@@ -66,6 +66,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private NsdServiceInfo mService;
     private DatagramSocket mSocket;
     private byte[] vals_buffer = null;
+    private byte[] disconnect_pattern = null;
     private final int poll_rate = 20;
     private Map<String, NsdServiceInfo> mServiceMap = new HashMap<>();
     private List<String> mServiceNames = new ArrayList<>();
@@ -160,15 +161,38 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             mContext = c;
         }
 
-        // Webpage uses this method to update joypad state:
-        // TODO: Investigate a WebMessagePort-based solution which works for Lollipop and older
+        // The following methods are called from within the WebView.
+
+        /* update_vals(String vals) sends an ISO-8859-1 string containing the
+         * current gamepad status, which is sent to the PC client as a stream of
+         * bytes.
+         *
+         * ArrayBuffers can be sent by encoding them as an ISO-8859-1 string first.
+         * There doesn't seem to be a way to send an arbitrary number of
+         * bytes directly.
+        */
         @JavascriptInterface
         public void update_vals(String vals) {
             vals_buffer = vals.getBytes(Charset.forName("ISO-8859-1"));
-            // Don't force an update. Polling rate must be consistent in app and PC client,
-            // or else messages will be lost anyways:
-            // update();
         }
+
+        /* Set the disconnection pattern.
+         * If set, Yoke will send three times this pattern in the event of deliberate
+         * disconnection (when the user taps the Reconnect button or selects a different
+         * option from the spinner).
+         *
+         * This pattern is unset automatically every time a new page loads.
+         */
+        @JavascriptInterface
+        public void set_bye(String m) {
+            disconnect_pattern = m.getBytes(Charset.forName("ISO-8859-1"));
+        }
+
+        /* alert() displays a pop-up on the Yoke app. This is intended as a replacement
+         * of the JavaScript alert() function, as prompts can't be shown on a WebView.
+         *
+         * Unlike JS's native function, this function doesn't block the JavaScript thread.
+         */
         @JavascriptInterface
         public void alert(String m) {
             AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this, R.style.WebviewPrompt);
@@ -714,22 +738,17 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         mNsdManager.stopServiceDiscovery(this);
     }
 
-    // requestDisconnect() sends a copy of the current status with its first byte changed to 0xFF
+    // requestDisconnect() sends the disconnect_pattern set by set_disconnect_pattern()
     // before closing the connection. This signals the PC client to disconnect the device.
-    // (Enforcing the same length on the message as the previous one seems to be required on Windows.)
     //
-    // This warning is not to be sent on accidental disconnections (like exiting the app) or error
-    // states (that usually happen when the client is no longer listening).
+    // This warning is not to be sent on accidental disconnections (like exiting the app)
+    // or error states (that usually happen when the client is no longer listening).
     private void requestDisconnect() {
-        if (mSocket != null && vals_buffer != null) {
-            byte[] impending_disconnect = new byte[vals_buffer.length];
-            // Disable auto-update to avoid race conditions:
-            vals_buffer = null;
-            // Change all bytes to the disconnection signal, and send three times:
-            Arrays.fill(impending_disconnect, (byte) 0xFF);
-            send(impending_disconnect);
-            send(impending_disconnect);
-            send(impending_disconnect);
+        if (mSocket != null && disconnect_pattern != null) {
+            // Send three times, just in case:
+            send(disconnect_pattern);
+            send(disconnect_pattern);
+            send(disconnect_pattern);
             log(res.getString(R.string.log_warning_shot));
         }
     }
@@ -741,9 +760,9 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         // Don't update the last status report:
         wv.loadUrl("about:blank");
         vals_buffer = null;
+        disconnect_pattern = null;
         mService = null;
-        if (currentHost != null)
-            currentHost = null;
+        currentHost = null;
         mTextView.setText(res.getString(R.string.toolbar_connect_to));
         if (!mSpinner.getSelectedItem().toString().equals(NOTHING)) {
             mSpinnerAutomatic = true;
