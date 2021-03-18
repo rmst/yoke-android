@@ -16,7 +16,6 @@
 
     <!-- Popups shown on user mistake -->
     <string name="info_connected_to_nowhere">Por favor, usa el menú desplegable para conectarte a una máquina.</string>
-    <string name="info_could_not_connect">No se pudo conectar a %1$s:%2$d.</string>
     <string name="info_download_layout_first">Es necesario descargar un mando. Haz clic en el ⋮ botón menú, luego en «%1$s» y luego en ↻ «%2$s».</string>
     <string name="info_invalid_address">Dirección inválida.</string>
     <!-- or a toast on success: -->
@@ -42,7 +41,10 @@
     <string name="error_could_not_rename">No se pudo renombrar %1$s</string>
     <string name="error_io_exception">Error de lectura/escritura (IOException): %1$s.</string>
     <string name="error_json_exception">Error interpretando manifiesto (JSONException): %1$s.</string>
-    <string name="error_connection_refused">Conexión rechazada. Comprueba si Yoke fue iniciado en tu ordenador.</string>
+    <string name="error_failed_download">No se encontró el servidor web. Por favor, comprueba si Yoke fue iniciado en tu ordenador.</string>
+    <string name="error_connection_refused">Conexión rechazada. Por favor, comprueba si Yoke fue iniciado en tu ordenador.</string>
+    <string name="error_pc_client_closed">El cliente Yoke para PC se ha detenido. Puedes ver más información en tu ordenador.</string>
+    <string name="error_network_unreachable">No hay conexión a internet. Comprueba que este dispositivo está conectado a tu red.</string>
     <string name="error_security_exception">Un gestor de seguridad impide a Yoke leer o escribir archivos (SecurityException).</string>
     <string name="error_sending_security_exception">Un gestor de seguridad impide a Yoke comunicarse con tu ordenador.</string>
     <string name="error_service_null">Servicio nulo.</string>
@@ -72,5 +74,6 @@
     <string name="log_spinner_automatic">Spinner cambiado automáticamente a "%1$s" (pos %2$d).</string>
     <string name="log_spinner_selected">«%1$s» (pos %2$d) seleccionado en el spinner.</string>
     <string name="log_udp_closed">Conexión cerrada.</string>
+    <string name="log_warning_shot">Enviada la señal de desconexión.</string>
 </resources>
 

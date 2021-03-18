@@ -16,7 +16,6 @@
 
     <!-- Popups shown on user mistake -->
     <string name="info_connected_to_nowhere">Please use the dropdown menu to connect to a machine.</string>
-    <string name="info_could_not_connect">Failed to connect to %1$s:%2$d.</string>
     <string name="info_download_layout_first">You need to download a gamepad. Click the ⋮ menu button, then "%1$s", then ↻ "%2$s".</string>
     <string name="info_invalid_address">Invalid address.</string>
     <!-- or a toast on success: -->
@@ -37,12 +36,16 @@
     (If they're not going to be able to fix it, better be specific) -->
     <string name="error_discovery_failed">Service discovery failed with error code %1$d.</string>
     <string name="error_open_udp_error">Failed to open UDP socket to %1$s:%2$d.</string>
+    <string name="error_could_not_connect">Failed to connect to %1$s</string>
     <string name="error_could_not_create_folder">Could not create folder %1$s</string>
     <string name="error_could_not_delete">Could not delete %1$s</string>
     <string name="error_could_not_rename">Could not rename %1$s</string>
     <string name="error_io_exception">Read/write error (IOException): %1$s.</string>
     <string name="error_json_exception">Error parsing manifest (JSONException): %1$s.</string>
-    <string name="error_connection_refused">Connection refused. Check if Yoke is running on your PC.</string>
+    <string name="error_failed_download">Webserver not found. Please check if Yoke is running on your PC.</string>
+    <string name="error_connection_refused">Connection refused. Please check if Yoke is running on your PC.</string>
+    <string name="error_pc_client_closed">The Yoke client for PC has stopped. You can check your PC screen for more information.</string>
+    <string name="error_network_unreachable">No Internet connection. Please make sure this device is connected to your network.</string>
     <string name="error_security_exception">A Security Manager is preventing Yoke from reading or writing files (SecurityException).</string>
     <string name="error_sending_security_exception">A Security Manager is preventing Yoke from communicating with your PC.</string>
     <string name="error_service_null">Service null.</string>
@@ -72,5 +75,6 @@
     <string name="log_spinner_automatic">Spinner set automatically to "%1$s" (pos %2$d).</string>
     <string name="log_spinner_selected">"%1$s" (pos %2$d) selected in the spinner.</string>
     <string name="log_udp_closed">Connection closed.</string>
+    <string name="log_warning_shot">Sent disconnect signal.</string>
 </resources>
 

@@ -47,6 +47,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -65,12 +66,14 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
     private NsdServiceInfo mService;
     private DatagramSocket mSocket;
     private byte[] vals_buffer = null;
+    private byte[] disconnect_pattern = null;
+    private final int poll_rate = 20;
     private Map<String, NsdServiceInfo> mServiceMap = new HashMap<>();
     private List<String> mServiceNames = new ArrayList<>();
     private SharedPreferences sharedPref;
     private TextView mTextView;
     private Spinner mSpinner;
-    private boolean mSpinnerAutomatic = false;
+    private volatile boolean mSpinnerAutomatic = false;
     private String oldtgt;
     private ProgressBar mProgressBar;
     private ArrayAdapter<String> mAdapter;
@@ -158,13 +161,38 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             mContext = c;
         }
 
-        // Webpage uses this method to update joypad state:
-        // TODO: Investigate a WebMessagePort-based solution which works for Lollipop and older
+        // The following methods are called from within the WebView.
+
+        /* update_vals(String vals) sends an ISO-8859-1 string containing the
+         * current gamepad status, which is sent to the PC client as a stream of
+         * bytes.
+         *
+         * ArrayBuffers can be sent by encoding them as an ISO-8859-1 string first.
+         * There doesn't seem to be a way to send an arbitrary number of
+         * bytes directly.
+        */
         @JavascriptInterface
         public void update_vals(String vals) {
             vals_buffer = vals.getBytes(Charset.forName("ISO-8859-1"));
-            update();
         }
+
+        /* Set the disconnection pattern.
+         * If set, Yoke will send three times this pattern in the event of deliberate
+         * disconnection (when the user taps the Reconnect button or selects a different
+         * option from the spinner).
+         *
+         * This pattern is unset automatically every time a new page loads.
+         */
+        @JavascriptInterface
+        public void set_bye(String m) {
+            disconnect_pattern = m.getBytes(Charset.forName("ISO-8859-1"));
+        }
+
+        /* alert() displays a pop-up on the Yoke app. This is intended as a replacement
+         * of the JavaScript alert() function, as prompts can't be shown on a WebView.
+         *
+         * Unlike JS's native function, this function doesn't block the JavaScript thread.
+         */
         @JavascriptInterface
         public void alert(String m) {
             AlertDialog.Builder builder = new AlertDialog.Builder(YokeActivity.this, R.style.WebviewPrompt);
@@ -212,7 +240,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 logError(res.getString(R.string.error_security_exception), e);
                 cancel(true);
             } catch (IOException e) {
-                logError(e.getLocalizedMessage(), e);
+                logError(e.getMessage(), e);
                 cancel(true);
             }
         }
@@ -283,10 +311,14 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                     return PING_SUCCESS;
                 }
             } catch (IOException e) {
-                if (e.getLocalizedMessage().contains(" ECONNREFUSED ")) {
+                if (e.getMessage().contains(" ECONNREFUSED ")) {
                     logError(res.getString(R.string.error_connection_refused), e);
+                } else if (e.getMessage().contains(" ENETUNREACH ")) {
+                    logError(res.getString(R.string.error_network_unreachable), e);
+                } else if (e.getMessage().startsWith("Failed to connect to")) {
+                    logError(res.getString(R.string.error_failed_download), e);
                 } else {
-                    logError(e.getLocalizedMessage(), e);
+                    logError(e.getMessage(), e);
                 }
                 cancel(true);
             } catch (JSONException e) {
@@ -424,7 +456,8 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 }
 
                 if (tgt.equals(NOTHING)) {
-                    closeConnection();
+                    requestDisconnect();
+                    closeSocket();
                 } else if (tgt.equals(ENTER_IP)) {
                     mSpinnerAutomatic = true;
                     mSpinner.setSelection(mAdapter.getPosition(oldtgt));
@@ -433,7 +466,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                     builder.setTitle(res.getString(R.string.enter_ip_title));
 
                     final EditText input = new EditText(YokeActivity.this);
-                    input.setInputType(InputType.TYPE_CLASS_TEXT);
+                    input.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
                     input.setHint(res.getString(R.string.enter_ip_hint));
 
                     builder.setView(input);
@@ -508,7 +541,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
                 update();
 
                 if (handler != null)
-                    handler.postDelayed(this, 20);
+                    handler.postDelayed(this, poll_rate);
             }
         });
 
@@ -520,7 +553,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
 
         mNsdManager.stopServiceDiscovery(this);
 
-        closeConnection();
+        closeSocket();
 
         handler = null;
     }
@@ -550,14 +583,16 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             mSocket.send(new DatagramPacket(msg, msg.length));
         } catch (SecurityException e) {
             logError(res.getString(R.string.error_sending_security_exception), e);
-            closeConnection();
+            closeSocket();
         } catch (IOException e) {
-            if (e.getLocalizedMessage().contains(" ECONNREFUSED ")) {
-                logError(res.getString(R.string.error_connection_refused), e);
+            if (e.getMessage().contains(" ECONNREFUSED ")) {
+                logError(res.getString(R.string.error_pc_client_closed), e);
+            } else if (e.getMessage().contains(" ENETUNREACH ")) {
+                logError(res.getString(R.string.error_network_unreachable), e);
             } else {
-                logError(e.getLocalizedMessage(), e);
+                logError(e.getMessage(), e);
             }
-            closeConnection();
+            closeSocket();
         }
     }
 
@@ -568,7 +603,7 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
             @Override
             public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
                 logError(String.format(res.getString(R.string.log_service_resolve_error), errorCode), null);
-                closeConnection();
+                closeSocket();
             }
 
             @Override
@@ -596,12 +631,12 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         if (currentHost == null) {
             logInfo(res.getString(R.string.info_connected_to_nowhere));
         } else {
-            log(res.getString(R.string.log_udp_closed));
-            mSocket.close();
-            mSocket = null;
-            wv.loadUrl("about:blank");
-            vals_buffer = null;
-            (new Thread(()-> openSocket(currentHost, currentPort))).start();
+            requestDisconnect();
+            closeSocket();
+            mSpinnerAutomatic = true;
+            mSpinner.setSelection(mAdapter.getPosition(tgt));
+            connectToAddress(tgt);
+            mSpinnerAutomatic = false;
         }
     }
 
@@ -703,22 +738,41 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         mNsdManager.stopServiceDiscovery(this);
     }
 
-    private void closeConnection() {
-        log(res.getString(R.string.log_closing_connection));
-        vals_buffer = null;
-        mService = null;
-        if (mSocket != null) {
-            log(res.getString(R.string.log_udp_closed));
-            mSocket.close();
-            mSocket = null;
+    // requestDisconnect() sends the disconnect_pattern set by set_disconnect_pattern()
+    // before closing the connection. This signals the PC client to disconnect the device.
+    //
+    // This warning is not to be sent on accidental disconnections (like exiting the app)
+    // or error states (that usually happen when the client is no longer listening).
+    private void requestDisconnect() {
+        if (mSocket != null && disconnect_pattern != null) {
+            // Send three times, just in case:
+            send(disconnect_pattern);
+            send(disconnect_pattern);
+            send(disconnect_pattern);
+            log(res.getString(R.string.log_warning_shot));
         }
-        if (currentHost != null)
-            currentHost = null;
+    }
+
+    // closeSocket() closes the connection as soon as possible. It disables the periodic
+    // status transmissions, then closes the socket, then updates the UI to reflect this.
+    private void closeSocket() {
+        log(res.getString(R.string.log_closing_connection));
+        // Don't update the last status report:
         wv.loadUrl("about:blank");
+        vals_buffer = null;
+        disconnect_pattern = null;
+        mService = null;
+        currentHost = null;
         mTextView.setText(res.getString(R.string.toolbar_connect_to));
         if (!mSpinner.getSelectedItem().toString().equals(NOTHING)) {
             mSpinnerAutomatic = true;
             mSpinner.setSelection(mAdapter.getPosition(NOTHING));
+        }
+        // Delayed to the very end, to sidestep occasional errors:
+        if (mSocket != null) {
+            mSocket.close();
+            mSocket = null;
+            log(res.getString(R.string.log_udp_closed));
         }
     }
 }
