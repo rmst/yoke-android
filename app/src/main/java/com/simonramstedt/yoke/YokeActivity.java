@@ -558,6 +558,13 @@ public class YokeActivity extends Activity implements NsdManager.DiscoveryListen
         handler = null;
     }
 
+    @Override
+    public void onBackPressed() {
+	if (mSocket == null ) {
+		super.onBackPressed();
+	}
+    }
+
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
